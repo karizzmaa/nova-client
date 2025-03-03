@@ -46,6 +46,6 @@ Select the extension folder and press enter.
 - [x] FPS Uncap
 - [ ] Custom Crosshair Changer
 - [ ] Movement Smoothing
-- [ ] Clean Menu
+- [x] Clean Menu
 - [ ] Background Changer
 - [ ] Background Music Changer
