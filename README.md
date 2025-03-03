@@ -1,5 +1,13 @@
-# Introduction
-Nova Client is a feature rich Survev.io client.
+<div align="center">
+      <img src="icon.png" alt="Logo" width="128" height="128">
+   </a>
+   <h1 align="center">Nova Client</h1>
+   <p align="center">
+      A User Friendly Client for Survev.io
+   </p>
+</div>
+
+
 ## Installation 
 ### Userscript
 Download [Tampermonkey](https://www.tampermonkey.net/crx/tampermonkey_stable.crx)
