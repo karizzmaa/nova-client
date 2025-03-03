@@ -49,3 +49,6 @@ Select the extension folder and press enter.
 - [x] Clean Menu
 - [ ] Background Changer
 - [ ] Background Music Changer
+- [ ] Skin Switcher
+- [ ] Auto Updating
+      
