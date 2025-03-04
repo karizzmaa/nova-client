@@ -12,7 +12,7 @@
 ### Userscript
 Download [Tampermonkey](https://www.tampermonkey.net/crx/tampermonkey_stable.crx)
 
-Then download the userscript from [click](https://raw.githubusercontent.com/karizzmaa/nova-client/refs/heads/main/nova-client.js).
+Then download the userscript from [click](https://raw.githubusercontent.com/karizzmaa/nova-client/main/dist/nova-client.js).
 
 ### Extension
 
