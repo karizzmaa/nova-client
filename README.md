@@ -40,9 +40,9 @@ Select the extension folder and press enter.
 - [x] FPS Counter
 - [x] Ping Counter
 - [x] FPS Uncap
+- [x] Clean Menu
 - [ ] Custom Crosshair Changer
 - [ ] Movement Smoothing
-- [x] Clean Menu
 - [ ] Background Changer
 - [ ] Background Music Changer
 - [ ] Skin Switcher
