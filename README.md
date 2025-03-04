@@ -34,10 +34,6 @@ Go back to chrome://extensions and press load unpacked.
 Select the extension folder and press enter.
 
 
-# Sneak Peek ( ͡° ͜ʖ ͡°)
-
-![preview](https://github.com/karizzmaa/nova-client/blob/main/github-assets/preview.png?raw=true)
-
 
 # Roadmap
 
