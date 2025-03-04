@@ -48,3 +48,15 @@ Select the extension folder and press enter.
 - [ ] Skin Switcher
 - [ ] Auto Updating
       
+# Credits
+LAT Counter - Asphixia (wzld)
+
+FPS Counter - Junako (.junako)
+
+Uncap FPS - Blubbed
+
+
+
+the real matex - for giving me ideas and encouraging me
+
+asultra - for answering my stupid question lol
