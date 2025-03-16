@@ -1,4 +1,4 @@
-<div align="center">
+a<div align="center">
       <img src="icon.png" alt="Logo" width="128" height="128">
    </a>
    <h1 align="center">Nova Client</h1>
@@ -39,3 +39,9 @@ Uncap FPS - Blubbed
 the real matex - for giving me ideas and encouraging me
 
 asultra - for answering my stupid question lol
+
+
+
+
+
+v2.0 is in the works
