@@ -20,12 +20,19 @@
 <li> Toggleable Glassmorphism
 <li> Clean Menu
 
-## Installation 
+# Installation 
 
 
 Download [Tampermonkey](https://www.tampermonkey.net/crx/tampermonkey_stable.crx)
 
-Then download the userscript from [click](https://raw.githubusercontent.com/karizzmaa/nova-client/main/dist/userscript.js).
+Then download the userscript from [here](https://raw.githubusercontent.com/karizzmaa/nova-client/main/dist/userscript.js).
+
+
+## Crosshair Tutorial
+1. Go to https://alimg.github.io/crosshair-for-survivio/
+2. Create your crosshair or upload an svg
+3. Drag the red "CROSSHAIR FOR SURVIVIO" cell to the URL bar
+4. Copy the code and paste it into the menu
 
 # Credits
 
