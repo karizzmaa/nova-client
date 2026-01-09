@@ -7,6 +7,18 @@
    </p>
 </div>
 
+# Features
+
+<ul>
+<li> FPS Counter
+<li> Ping Counter
+<li> Custom Labels
+<li> Uncap FPS
+<li> Auto Fullscreen
+<li> Custom Crosshairs
+<li> Interchangeable Backgrounds
+<li> Toggleable Glassmorphism
+<li> Clean Menu
 
 ## Installation 
 
