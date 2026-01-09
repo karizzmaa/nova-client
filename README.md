@@ -7,6 +7,8 @@
    </p>
 </div>
 
+# Discord Server
+Please join our discord server from [here](https://discord.gg/ar6TjbVzSF)!
 # Features
 
 <ul>
