@@ -1,633 +1,651 @@
 // ==UserScript==
 // @name         Nova Client
-// @namespace    https://github.com/karizzmaa/nova-client
-// @version      1.0
+// @namespace    https://github.com/karizzmaa/nova-client/
+// @version      2.0
 // @description  Customizable Mod menu for Survev.io
 // @author       karizzmaa
 // @match        *://survev.io/*
+// @match        *://66.179.254.36/*
+// @match        *://185.126.158.61/*
+// @match        *://resurviv.biz/*
+// @match        *://leia-uwu.github.io/survev/*
+// @match        *://survev.leia-is.gay/*
+// @match        *://survivx.org/*
+// @match        *://kxs.rip/*
+// @match        *://localhost:3000/*
+// @match        *://veldreth.com/*
+// @match        *://eu-comp.net/*
+// @match        *://66.179.92.117/*
 // @match        *://zurviv.io/*
-// @match        *://*.survev.io/*
-// @match        *://*.zurviv.io/*
-// @grant        GM_getResourceURL
+// @match        *://cursev.io/*
+// @match        *://eu-comp.zurviv.io/*
+// @match        *://uno.cheap/*
 // @grant        GM_addStyle
-// @grant        GM_setValue
-// @grant        GM_getValue
 // @icon         https://raw.githubusercontent.com/karizzmaa/nova-client/refs/heads/main/icon.png
 // ==/UserScript==
 
-(function () {
+(function() {
     'use strict';
 
+    const defaultBackgrounds = [
+        { id: 'b1', name: 'Turkey', data: 'https://raw.githubusercontent.com/survev/survev/refs/heads/master/client/public/img/main_splash_turkey_01.png', builtIn: true },
+        { id: 'b2', name: 'Easter', data: 'https://github.com/survev/survev/blob/master/client/public/img/main_splash_easter.png?raw=true', builtIn: true },
+        { id: 'b3', name: 'Desert', data: 'https://github.com/survev/survev/blob/master/client/public/img/main_splash_desert_01.png?raw=true', builtIn: true },
+        { id: 'b4', name: 'Halloween', data: 'https://raw.githubusercontent.com/survev/survev/refs/heads/master/client/public/img/main_splash_halloween.png', builtIn: true },
+        { id: 'b5', name: 'Cobalt', data: 'https://github.com/survev/survev/blob/master/client/public/img/main_splash_cobalt.png?raw=true', builtIn: true },
+        { id: 'b10', name: 'Main', data: 'https://raw.githubusercontent.com/survev/survev/refs/heads/master/client/public/img/main_splash.png', builtIn: true }
+    ];
+
+    const defaultConfig = {
+        fps: false, ping: false, uncap: false, glass: true, fastMenu: false, cleanMenu: false, autoFS: false,
+        activeCrosshair: null, customCrosshairs: [],
+        activeBackground: 'b10', customBackgrounds: [],
+        shuffleEnabled: false,
+
+        fpsPos: { top: '60%', left: '10px' },
+        pingPos: { top: '65%', left: '10px' },
+        customLabels: []
+    };
+
+    let config = JSON.parse(localStorage.getItem('nova_config')) || defaultConfig;
+
+    config = { ...defaultConfig, ...config };
+
+    if(!config.fpsPos) config.fpsPos = defaultConfig.fpsPos;
+    if(!config.pingPos) config.pingPos = defaultConfig.pingPos;
+    if(!config.customLabels) config.customLabels = [];
+
+    let shuffleInterval = null;
+
+    function saveConfig() { localStorage.setItem('nova_config', JSON.stringify(config)); }
+
+    let fpsDisplay = null;
+    let fpsAnimationId = null;
+    let pingDisplay = null;
+    let ws = null;
+    const originalRAF = window.requestAnimationFrame;
+
     GM_addStyle(`
-    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css');
-    @keyframes slideIn {
-        from { transform: translate(-50%, -60%); opacity: 0; }
-        to { transform: translate(-50%, -50%); opacity: 1; }
-    }
-    @keyframes slideOut {
-        from { transform: translate(-50%, -50%); opacity: 1; }
-        to { transform: translate(-50%, -60%); opacity: 0; }
-    }
-    .switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 20px;
-    }
-    .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-    .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #555;
-        transition: 0.3s;
-        border-radius: 20px;
-    }
-    .slider:before {
-        position: absolute;
-        content: "";
-        height: 16px;
-        width: 16px;
-        left: 2px;
-        bottom: 2px;
-        background-color: white;
-        transition: 0.3s;
-        border-radius: 50%;
-    }
-    input:checked + .slider {
-        background-color: ${GM_getValue('accentColor', '#2196F3')};
-    }
-    input:checked + .slider:before {
-        transform: translateX(20px);
-    }
-    .reload-popup button {
-        background-color: ${GM_getValue('accentColor', '#2196F3')};
-        border: none;
-        color: black;
-        padding: 8px 16px;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.3s, transform 0.2s;
-        margin: 0 5px;
-    }
-    .reload-popup button:hover {
-        background-color: ${GM_getValue('accentColor', '#2196F3')}cc;
-        transform: scale(1.05);
-    }
-    .reload-popup button:active {
-        transform: scale(0.95);
-    }
+        #nova-menu {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.7);
+            width: 580px; height: 500px; background: rgba(20, 20, 20, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+            color: white; font-family: 'Segoe UI', system-ui, sans-serif;
+            display: none; flex-direction: column; overflow: hidden; z-index: 10000;
+            opacity: 0; box-shadow: 0 25px 50px rgba(0,0,0,0.5); user-select: none;
+        }
+        .nova-animate { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease; }
+        .nova-glass { backdrop-filter: blur(20px) saturate(180%); background: rgba(20, 20, 20, 0.6) !important; }
+        #nova-menu.active { display: flex; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        #nova-header { padding: 14px 20px; background: rgba(255, 255, 255, 0.05); display: flex; justify-content: space-between; align-items: center; cursor: move; }
+        #nova-nav { display: flex; gap: 8px; padding: 10px 15px; background: rgba(0, 0, 0, 0.2); border-bottom: 1px solid rgba(255, 255, 255, 0.05); overflow-x: auto; }
+        .nav-item { padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap; color: rgba(255, 255, 255, 0.6); transition: 0.2s; }
+        .nav-item.active { background: rgba(255, 255, 255, 0.12); color: #60cdff; font-weight: 600; }
+        #nova-content { padding: 20px; flex-grow: 1; overflow-y: auto; position: relative; }
+        .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .cat-title { font-size: 20px; font-weight: 700; }
+        .item-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .item-card {
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px; aspect-ratio: 1/1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; position: relative; cursor: pointer; transition: 0.2s; overflow: hidden;
+        }
+        .item-card:hover { background: rgba(255,255,255,0.1); border-color: #60cdff; }
+        .item-card.active { border: 2px solid #60cdff; background: rgba(96, 205, 255, 0.1); }
+        .preview-img { width: 100%; height: 70%; object-fit: cover; pointer-events: none; opacity: 0.8; }
+        .xhair-preview { width: 42px; height: 42px; object-fit: contain; margin-bottom: 10px; }
+        .item-name { font-size: 11px; margin-top: 5px; opacity: 0.9; text-align: center; padding: 0 5px; }
+        .shuffle-btn { width: 32px; height: 32px; cursor: pointer; border-radius: 6px; padding: 6px; transition: 0.2s; background: rgba(255,255,255,0.05); }
+        .shuffle-btn:hover { background: rgba(96, 205, 255, 0.2); }
+        .shuffle-btn.active { background: #60cdff; }
+        .shuffle-icon { width: 100%; height: 100%; transition: filter 0.3s; }
+        .inverted-icon { filter: invert(1); }
+        #background { transition: opacity 0.8s ease-in-out; }
+        .add-btn { border: 2px dashed rgba(255,255,255,0.2); background: transparent; }
+        .item-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 4px; opacity: 0; transition: 0.2s; }
+        .item-card:hover .item-actions { opacity: 1; }
+        .action-btn { background: rgba(0,0,0,0.6); border-radius: 4px; padding: 2px 5px; font-size: 10px; color: white; }
+        .action-btn:hover { background: #60cdff; color: black; }
+        .tweak-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; margin-bottom: 8px; }
+        .win-switch { position: relative; display: inline-block; width: 44px; height: 22px; }
+        .win-switch input { opacity: 0; width: 0; height: 0; }
+        .win-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid rgba(255, 255, 255, 0.5); transition: .2s; border-radius: 22px; }
+        .win-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 4px; bottom: 3px; background-color: rgba(255, 255, 255, 0.8); transition: .2s; border-radius: 50%; }
+        input:checked + .win-slider { background-color: #60cdff; border-color: #60cdff; }
+        input:checked + .win-slider:before { transform: translateX(20px); background-color: #000; }
+        .nova-hidden { display: none !important; }
+        .nova-aligned-bar { position: relative !important; margin-top: 60px !important; display: flex !important; justify-content: center !important; }
+
+        /* New Styles for v2.1 */
+        .move-btn { margin-right: 10px; background: rgba(255,255,255,0.1); border:none; color:white; border-radius:4px; padding: 4px 8px; cursor: pointer; transition:0.2s; font-size:11px;}
+        .move-btn:hover { background: #60cdff; color:black; }
+
+        #edit-hud {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(20,20,20,0.9); border: 1px solid rgba(255,255,255,0.2);
+            padding: 10px 20px; border-radius: 30px; display: none; gap: 10px;
+            z-index: 10002; backdrop-filter: blur(10px);
+        }
+        .hud-btn { padding: 8px 20px; border-radius: 20px; border:none; cursor:pointer; font-weight:600; }
+        .hud-btn.reset { background: rgba(255,50,50,0.2); color: #ff6b6b; }
+        .hud-btn.done { background: #60cdff; color: black; }
+
+        .nova-label { position: fixed; color: white; font-size: 14px; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 5px; z-index: 10001; pointer-events: none; user-select: none; }
+        .draggable { pointer-events: auto !important; cursor: grab; border: 2px dashed #60cdff; background: rgba(96,205,255,0.2) !important; }
+        .draggable:active { cursor: grabbing; }
+
+        /* Modal specific */
+        .nova-modal {
+            position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8);
+            display:flex; justify-content:center; align-items:center; z-index: 10;
+        }
+        .modal-box { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); width: 300px; display:flex; flex-direction:column; gap:10px; }
+        .modal-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 4px; outline: none; }
+        .modal-row { display: flex; justify-content: space-between; align-items: center; }
+        .color-picker { width: 50px; height: 30px; border: none; cursor: pointer; }
     `);
 
-    let menu = null;
-    let fpsDisplay = null;
-    let fpsEnabled = false;
-    let pingDisplay = null;
-    let pingEnabled = true;
-    let uncapFPSEnabled = false;
-    let cleanMenuEnabled = false;
-    let accentColor = GM_getValue('accentColor', '#2196F3');
 
-    let sendTime, receiveTime, timeout, region, DOM_observer, ws;
+    function applyCrosshair(base64) {
+        const target = document.querySelector("#game-area-wrapper") || document.querySelector("canvas");
+        if (target) target.style.cursor = `url(${base64}) 16 16, auto`;
+    }
 
-    function initializePingCounter() {
-        pingDisplay = document.createElement('div');
-        pingDisplay.style.position = 'absolute';
-        pingDisplay.style.top = 'calc(60% + 25px)';
-        pingDisplay.style.left = '10px';
-        pingDisplay.style.transform = 'translateY(-50%)';
-        pingDisplay.style.color = 'white';
-        pingDisplay.style.fontSize = '14px';
-        pingDisplay.style.fontFamily = '"roboto condensed", sans-serif';
-        pingDisplay.style.textShadow = '1px 1px 2px black';
-        pingDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
-        pingDisplay.style.padding = '3px 5px';
-        pingDisplay.style.borderRadius = '5px';
-        pingDisplay.style.zIndex = '10000';
-        pingDisplay.innerHTML = `Waiting for a game start...`;
-        document.body.appendChild(pingDisplay);
+    function applyBackground(url) {
+        const bg = document.querySelector("#background");
+        if (!bg) return;
+        bg.style.opacity = "0";
+        setTimeout(() => {
+            bg.style.backgroundImage = `url("${url}")`;
+            bg.style.opacity = "1";
+        }, 800);
+    }
 
-        var teamJoined = document.getElementById("msg-wait-reason"),
-            endBtn = document.getElementById("ui-stats-options");
+    function doShuffle() {
+        const pool = [...defaultBackgrounds, ...config.customBackgrounds];
+        const randomBg = pool[Math.floor(Math.random() * pool.length)];
+        config.activeBackground = randomBg.id;
+        saveConfig();
+        applyBackground(randomBg.data);
+    }
 
-        window.onload = () => {
-            var strtBtn = document.getElementsByClassName("btn-green btn-darken menu-option");
-            var strtBtnArray = [strtBtn[0], strtBtn[1], strtBtn[2]];
-            strtBtnArray.forEach((btn) => {
-                btn.onclick = () => {
-                    region = document.getElementById("server-select-main").value;
-                    getPing();
-                };
-            });
-            strtBtn[3].onclick = () => {
-                region = document.getElementById("team-server-select").value;
-                getPing();
-            };
+    function toggleShuffle(enabled) {
+        config.shuffleEnabled = enabled;
+        saveConfig();
+        if (enabled) {
+            if (!shuffleInterval) shuffleInterval = setInterval(doShuffle, 600000);
+        } else {
+            clearInterval(shuffleInterval);
+            shuffleInterval = null;
+        }
+    }
+
+    function extractBase64(input) {
+        const match = input.match(/data:image\/[a-zA-Z]+;base64,[^'")\s]+/);
+        return match ? match[0] : input;
+    }
+
+s
+
+    const editHud = document.createElement('div');
+    editHud.id = 'edit-hud';
+    editHud.innerHTML = `<button class="hud-btn reset">Reset</button><button class="hud-btn done">Done</button>`;
+    document.body.appendChild(editHud);
+
+    function enterEditMode(element, configKey, defaultPos, onDone) {
+        if (!element) return;
+
+        toggleMenu(false);
+        editHud.style.display = 'flex';
+        element.classList.add('draggable');
+
+        let isDragging = false;
+        let startX, startY, initialLeft, initialTop;
+
+        const onMouseDown = (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialLeft = element.offsetLeft;
+            initialTop = element.offsetTop;
+            e.preventDefault();
         };
 
-        document.getElementById("btn-game-quit").onclick = () => {
-            ws.close();
+        const onMouseMove = (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            element.style.left = `${initialLeft + dx}px`;
+            element.style.top = `${initialTop + dy}px`;
+            element.style.transform = 'none'; // remove center transforms if any
         };
-        document.getElementById("btn-spectate-quit").onclick = () => {
-            ws.close();
+
+        const onMouseUp = () => { isDragging = false; };
+
+        element.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+
+
+        editHud.querySelector('.reset').onclick = () => {
+            element.style.top = defaultPos.top;
+            element.style.left = defaultPos.left;
+            if(defaultPos.top.includes('%')) element.style.transform = 'translateY(-50%)';
         };
-        DOM_observer = new MutationObserver((mutations) => {
-            if (mutations[0].addedNodes.length === 1) {
-                endBtn.getElementsByTagName("a")[0].onclick = () => {
-                    ws.close();
-                };
-            } else if (mutations[0].addedNodes.length === 3) {
-                region = document.getElementById("team-server-select").value;
-                delayConnect();
-            }
-        });
-        DOM_observer.observe(endBtn, {
-            childList: true
-        });
-        DOM_observer.observe(teamJoined, {
-            childList: true
-        });
 
-        function wsUrl() {
-            var wsUrl, wsRegion;
-            if (region === 'na') {
-                wsRegion = 'usr';
-            } else if (region === 'eu') {
-                wsRegion = 'eur';
-            } else if (region === 'asia') {
-                wsRegion = 'asr';
-            } else if (region === 'sa') {
-                wsRegion = 'sa';
-            }
-            wsUrl = `wss://${wsRegion}.mathsiscoolfun.com:8001/ptc`;
-            return wsUrl;
-        }
 
-        function delayConnect() {
-            timeout = setTimeout(getPing, 2500);
-        }
+        editHud.querySelector('.done').onclick = () => {
 
-        function doSend(message) {
-            if (ws.readyState === 1) {
-                sendTime = Date.now();
-                ws.send(message);
-            }
-        }
+            if (configKey) {
 
-        function getPing() {
-            var ping, url = wsUrl();
-            ws = new WebSocket(url);
-
-            ws.onopen = () => {
-                clearTimeout(timeout);
-                doSend(new ArrayBuffer(1));
-            };
-
-            ws.onclose = (evt) => {
-                if (evt.code === 1005) {
-                    pingDisplay.innerHTML = `Waiting for a game start...`;
-                    pingDisplay.style.color = "white";
-                } else if (evt.code === 1006) {
-                    ws = null;
-                    delayConnect();
+                if (typeof configKey === 'string') {
+                    config[configKey] = { top: element.style.top, left: element.style.left };
+                } else if (typeof configKey === 'object' && configKey.type === 'label') {
+                    const lbl = config.customLabels.find(l => l.id === configKey.id);
+                    if(lbl) {
+                        lbl.top = element.style.top;
+                        lbl.left = element.style.left;
+                    }
                 }
-            };
+                saveConfig();
+            }
 
-            ws.onmessage = () => {
-                receiveTime = Date.now();
-                ping = receiveTime - sendTime;
-                if (ping >= 120) {
-                    pingDisplay.style.color = "red";
-                } else if (ping >= 90 && ping < 120) {
-                    pingDisplay.style.color = "orange";
-                } else {
-                    pingDisplay.style.color = "white";
-                }
-                pingDisplay.innerHTML = `${ping} ms`;
-                setTimeout(() => {
-                    doSend(new ArrayBuffer(1));
-                }, 1500);
-            };
 
-            ws.onerror = () => {
-                pingDisplay.innerHTML = `NaN ms`;
-                pingDisplay.style.color = "white";
-            };
-        }
+            element.classList.remove('draggable');
+            element.removeEventListener('mousedown', onMouseDown);
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+            editHud.style.display = 'none';
+
+            toggleMenu(true);
+            if(onDone) onDone();
+        };
     }
 
-    initializePingCounter();
 
-    function createMenu() {
-        menu = document.createElement('div');
-        menu.style.position = 'fixed';
-        menu.style.top = '50%';
-        menu.style.left = '50%';
-        menu.style.transform = 'translate(-50%, -50%)';
-        menu.style.width = '380px';
-        menu.style.height = 'auto';
-        menu.style.backgroundColor = '#1e1e1e';
-        menu.style.border = `1px solid ${accentColor}`;
-        menu.style.borderRadius = '10px';
-        menu.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.5)';
-        menu.style.color = '#fff';
-        menu.style.fontFamily = 'Arial, sans-serif';
-        menu.style.zIndex = '1000';
-        menu.style.padding = '20px';
-        menu.style.animation = 'slideIn 0.3s ease-out';
-
-        const header = document.createElement('div');
-        header.style.textAlign = 'center';
-        header.style.fontSize = '20px';
-        header.style.marginBottom = '15px';
-        header.textContent = 'Nova Client';
-        menu.appendChild(header);
-
-        const tabs = document.createElement('div');
-        tabs.style.display = 'flex';
-        tabs.style.justifyContent = 'space-around';
-        tabs.style.marginBottom = '15px';
-
-        ['Labels', 'Gameplay', 'Client', 'Misc', 'Info'].forEach(tabText => {
-            const tab = document.createElement('button');
-            tab.textContent = tabText;
-            tab.style.cursor = 'pointer';
-            tab.style.padding = '10px 20px';
-            tab.style.border = 'none';
-            tab.style.borderRadius = '5px';
-            tab.style.backgroundColor = '#333';
-            tab.style.color = '#fff';
-            tab.style.fontSize = '14px';
-            tab.style.transition = 'background-color 0.3s, transform 0.2s';
-
-            tab.addEventListener('mouseover', () => {
-                tab.style.backgroundColor = '#444';
-                tab.style.transform = 'scale(1.05)';
-            });
-
-            tab.addEventListener('mouseout', () => {
-                tab.style.backgroundColor = '#333';
-                tab.style.transform = 'scale(1)';
-            });
-
-            tab.addEventListener('mousedown', () => {
-                tab.style.transform = 'scale(0.95)';
-            });
-
-            tab.addEventListener('mouseup', () => {
-                tab.style.transform = 'scale(1.05)';
-            });
-
-            tab.addEventListener('click', () => {
-                Array.from(tabs.children).forEach(t => {
-                    t.style.backgroundColor = '#333';
-                    t.style.border = 'none';
-                });
-                tab.style.backgroundColor = '#555';
-                tab.style.border = `2px solid ${accentColor}`;
-                updateContent(tabText);
-            });
-
-            tabs.appendChild(tab);
-        });
-
-        menu.appendChild(tabs);
-
-        const content = document.createElement('div');
-        content.style.padding = '15px';
-        content.style.minHeight = '150px';
-        content.innerHTML = '<p>Content for Labels</p>';
-        menu.appendChild(content);
-
-        const footer = document.createElement('div');
-        footer.style.textAlign = 'center';
-        footer.style.marginTop = '15px';
-        footer.style.color = '#888';
-        footer.style.fontSize = '12px';
-        footer.textContent = 'Made with ❤️ By Karizma';
-        menu.appendChild(footer);
-
-        document.body.appendChild(menu);
-
-        const labelsTab = tabs.children[0];
-        labelsTab.click();
-
-        function updateContent(tabText) {
-            let contentText = '';
-            switch (tabText) {
-                case 'Labels':
-                    contentText = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <span>FPS Counter</span>
-                    <label class="switch">
-                    <input type="checkbox" id="fpsToggle">
-                    <span class="slider"></span>
-                    </label>
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <span>Ping/LAT Counter</span>
-                    <label class="switch">
-                    <input type="checkbox" id="pingToggle">
-                    <span class="slider"></span>
-                    </label>
-                    </div>
-                    `;
-                    break;
-                case 'Gameplay':
-                    contentText = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <span>Uncap FPS</span>
-                    <label class="switch">
-                    <input type="checkbox" id="uncapFPSToggle">
-                    <span class="slider"></span>
-                    </label>
-                    </div>
-                    `;
-                    break;
-                case 'Client':
-                    contentText = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <span>Accent Color</span>
-                    <input type="color" id="accentColorPicker" value="${accentColor}" style="margin-left: 10px;">
-                    </div>
-                    `;
-                    break;
-                case 'Info':
-                    contentText = `
-                    <p>Nova Client is a customizable client for survev.io</p>
-                    <div style="text-align: center; margin-top: 20px; margin-bottom: 10px;">
-                    <a href="https://github.com/karizzmaa" target="_blank" style="color: #888; text-decoration: none;">
-                    <i class="fab fa-github" style="font-size: 24px; margin-right: 10px;"></i>
-                    </a>
-                    <i class="fa-brands fa-discord" style="font-size: 24px; color: #888; cursor: pointer;"></i>
-                    <div id="copied-message" style="color: green; font-size: 12px; margin-top: 5px; opacity: 0; transition: opacity 0.5s, transform 0.5s;"></div>
-                    </div>
-                    `;
-                    break;
-                case 'Misc':
-                    contentText = `
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                    <span>Clean Menu</span>
-                    <label class="switch">
-                    <input type="checkbox" id="cleanMenuToggle">
-                    <span class="slider"></span>
-                    </label>
-                    </div>
-                    `;
-                    break;
-            }
-            content.innerHTML = contentText;
-
-            if (tabText === 'Labels') {
-                const fpsToggle = content.querySelector('#fpsToggle');
-                fpsToggle.checked = fpsEnabled;
-
-                fpsToggle.addEventListener('change', () => {
-                    fpsEnabled = fpsToggle.checked;
-                    if (fpsEnabled) {
-                        enableFPS();
-                    } else {
-                        disableFPS();
-                    }
-                });
-
-                const pingToggle = content.querySelector('#pingToggle');
-                pingToggle.checked = pingEnabled;
-
-                pingToggle.addEventListener('change', () => {
-                    pingEnabled = pingToggle.checked;
-                    if (pingEnabled) {
-                        pingDisplay.style.display = 'block';
-                    } else {
-                        pingDisplay.style.display = 'none';
-                    }
-                });
-            }
-
-            if (tabText === 'Gameplay') {
-                const uncapFPSToggle = content.querySelector('#uncapFPSToggle');
-                uncapFPSToggle.checked = uncapFPSEnabled;
-
-                uncapFPSToggle.addEventListener('change', () => {
-                    uncapFPSEnabled = uncapFPSToggle.checked;
-                    if (uncapFPSEnabled) {
-                        uncapFPS();
-                    } else {
-                        window.requestAnimationFrame = originalRAF;
-                    }
-                });
-            }
-
-            if (tabText === 'Client') {
-                const accentColorPicker = content.querySelector('#accentColorPicker');
-                accentColorPicker.value = accentColor;
-
-                accentColorPicker.addEventListener('input', () => {
-                    accentColor = accentColorPicker.value;
-                    GM_setValue('accentColor', accentColor);
-                    menu.style.borderColor = accentColor;
-                    Array.from(tabs.children).forEach(tab => {
-                        if (tab.style.backgroundColor === 'rgb(85, 85, 85)') {
-                            tab.style.borderColor = accentColor;
-                        }
-                    });
-                    // Update toggle colors
-                    const toggles = document.querySelectorAll('.slider');
-                    toggles.forEach(toggle => {
-                        if (toggle.previousElementSibling.checked) {
-                            toggle.style.backgroundColor = accentColor;
-                        }
-                    });
-                });
-            }
-
-            if (tabText === 'Misc') {
-                const cleanMenuToggle = content.querySelector('#cleanMenuToggle');
-                cleanMenuToggle.checked = cleanMenuEnabled;
-
-                cleanMenuToggle.addEventListener('change', () => {
-                    cleanMenuEnabled = cleanMenuToggle.checked;
-                    if (cleanMenuEnabled) {
-                        cleanMenu();
-                    } else {
-                        showReloadPopup();
-                    }
-                });
-            }
-
-            if (tabText === 'Info') {
-                const discordIcon = content.querySelector('.fa-discord');
-                const copiedMessage = content.querySelector('#copied-message');
-
-                discordIcon.addEventListener('click', () => {
-                    navigator.clipboard.writeText('piesimp').then(() => {
-                        copiedMessage.textContent = 'Username Copied!';
-                        copiedMessage.style.opacity = '1';
-                        copiedMessage.style.transform = 'translateY(-10px)';
-                        setTimeout(() => {
-                            copiedMessage.style.opacity = '0';
-                            copiedMessage.style.transform = 'translateY(0)';
-                        }, 1000);
-                    });
-                });
-            }
-        }
-    }
-
-    function showReloadPopup() {
-        const popup = document.createElement('div');
-        popup.style.position = 'fixed';
-        popup.style.top = '50%';
-        popup.style.left = '50%';
-        popup.style.transform = 'translate(-50%, -50%)';
-        popup.style.backgroundColor = '#1e1e1e';
-        popup.style.border = `1px solid ${accentColor}`;
-        popup.style.borderRadius = '10px';
-        popup.style.padding = '20px';
-        popup.style.zIndex = '10000';
-        popup.style.color = '#fff';
-        popup.style.textAlign = 'center';
-        popup.style.animation = 'slideIn 0.3s ease-out';
-        popup.classList.add('reload-popup');
-
-        popup.innerHTML = `
-            <p>Reload Required</p>
-            <button id="reloadConfirm">Reload</button>
-            <button id="reloadCancel">Cancel</button>
-        `;
-
-        document.body.appendChild(popup);
-
-        document.getElementById('reloadConfirm').addEventListener('click', () => {
-            location.reload();
-        });
-
-        document.getElementById('reloadCancel').addEventListener('click', () => {
-            popup.style.animation = 'slideOut 0.3s ease-out';
-            popup.addEventListener('animationend', () => {
-                popup.remove();
-            }, { once: true });
-            const cleanMenuToggle = document.querySelector('#cleanMenuToggle');
-            if (cleanMenuToggle) cleanMenuToggle.checked = true; // Revert the toggle
-        });
-    }
-
-    function enableFPS() {
-        if (!fpsDisplay) {
+    function toggleFPS(enabled) {
+        config.fps = enabled; saveConfig();
+        if (enabled && !fpsDisplay) {
             fpsDisplay = document.createElement('div');
-            fpsDisplay.style.position = 'absolute';
-            fpsDisplay.style.top = '60%';
-            fpsDisplay.style.left = '10px';
-            fpsDisplay.style.transform = 'translateY(-50%)';
-            fpsDisplay.style.color = 'white';
-            fpsDisplay.style.fontSize = '14px';
-            fpsDisplay.style.fontFamily = '"roboto condensed", sans-serif';
-            fpsDisplay.style.textShadow = '1px 1px 2px black';
-            fpsDisplay.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
-            fpsDisplay.style.padding = '3px 5px';
-            fpsDisplay.style.borderRadius = '5px';
-            fpsDisplay.style.zIndex = '10000';
-            fpsDisplay.innerHTML = `0 FPS`;
-            document.body.appendChild(fpsDisplay);
+            fpsDisplay.className = 'nova-label';
+            fpsDisplay.style.top = config.fpsPos.top;
+            fpsDisplay.style.left = config.fpsPos.left;
+            if(config.fpsPos.top.includes('%')) fpsDisplay.style.transform = 'translateY(-50%)';
 
+            document.body.appendChild(fpsDisplay);
             let times = [];
-            const getFPS = () => {
-                window.requestAnimationFrame(() => {
+            const run = () => {
+                fpsAnimationId = requestAnimationFrame(() => {
                     const now = performance.now();
                     while (times.length > 0 && times[0] <= now - 1000) times.shift();
                     times.push(now);
-                    fpsDisplay.innerHTML = `${times.length} FPS`;
-                    if (times.length <= 30) {
-                        fpsDisplay.style.color = "red";
-                    } else {
-                        fpsDisplay.style.color = "white";
-                    }
-                    getFPS();
+                    if (fpsDisplay) { fpsDisplay.innerHTML = `${times.length} FPS`; run(); }
                 });
+            };
+            run();
+        } else if (!enabled && fpsDisplay) { fpsDisplay.remove(); fpsDisplay = null; cancelAnimationFrame(fpsAnimationId); }
+    }
+
+    function togglePing(enabled) {
+        config.ping = enabled; saveConfig();
+        if (enabled && !pingDisplay) {
+            pingDisplay = document.createElement('div');
+            pingDisplay.className = 'nova-label';
+            pingDisplay.innerHTML = 'Ping: -- ms';
+            pingDisplay.style.top = config.pingPos.top;
+            pingDisplay.style.left = config.pingPos.left;
+            if(config.pingPos.top.includes('%')) pingDisplay.style.transform = 'translateY(-50%)';
+
+            document.body.appendChild(pingDisplay);
+            initPingSocket();
+        } else if (!enabled && pingDisplay) {
+            if(ws) ws.close();
+            if(pingDisplay) pingDisplay.remove();
+            pingDisplay = null;
+        }
+    }
+
+    function initPingSocket() {
+        const getWsUrl = () => {
+            const reg = document.getElementById("server-select-main")?.value || 'na';
+            const map = { na: 'usr', eu: 'eur', asia: 'asr', sa: 'sa' };
+            return `wss://${map[reg] || 'usr'}.mathsiscoolfun.com:8001/ptc`;
+        };
+
+        const startPing = () => {
+            if (ws) ws.close();
+            ws = new WebSocket(getWsUrl());
+            let sendTime;
+
+            ws.onopen = () => { ws.send(new ArrayBuffer(1)); sendTime = Date.now(); };
+            ws.onmessage = () => {
+                const diff = Date.now() - sendTime;
+                if (pingDisplay) {
+                    pingDisplay.innerHTML = `Ping: ${diff} ms`;
+                    pingDisplay.style.color = diff > 120 ? "#ff4d4d" : (diff > 80 ? "#ffa500" : "white");
+                }
+                setTimeout(() => {
+                    if (ws && ws.readyState === 1) { sendTime = Date.now(); ws.send(new ArrayBuffer(1)); }
+                }, 1500);
+            };
+            ws.onclose = () => { if (config.ping && pingDisplay) pingDisplay.innerHTML = "Ping: Offline"; };
+            ws.onerror = () => { if (pingDisplay) pingDisplay.innerHTML = "Ping: Error"; };
+        };
+
+        document.addEventListener('click', (e) => {
+            if (e.target.classList?.contains('btn-green') || e.target.id === 'btn-start-team') {
+                setTimeout(startPing, 1000);
             }
-            getFPS();
-        }
+        });
     }
 
-    function disableFPS() {
-        if (fpsDisplay) {
-            document.body.removeChild(fpsDisplay);
-            fpsDisplay = null;
-        }
+    // custom labels ye
+
+    function renderCustomLabels() {
+        document.querySelectorAll('.nova-custom-lbl').forEach(e => e.remove());
+
+        config.customLabels.forEach(lbl => {
+            const el = document.createElement('div');
+            el.className = 'nova-label nova-custom-lbl';
+            el.id = `lbl-${lbl.id}`;
+            el.innerText = lbl.text;
+            el.style.color = lbl.color;
+            if(lbl.bold) el.style.fontWeight = 'bold';
+            if(lbl.italic) el.style.fontStyle = 'italic';
+            el.style.top = lbl.top;
+            el.style.left = lbl.left;
+            document.body.appendChild(el);
+        });
     }
 
-    const originalRAF = window.requestAnimationFrame;
+    function openLabelCreator() {
+        const modal = document.createElement('div');
+        modal.className = 'nova-modal';
+        modal.innerHTML = `
+            <div class="modal-box">
+                <h3 style="margin:0">Create Label</h3>
+                <input class="modal-input" type="text" id="lbl-text" placeholder="Label Text (e.g. Nickname)">
+                <div class="modal-row">
+                    <span>Color:</span>
+                    <input type="color" id="lbl-color" value="#ffffff" class="color-picker">
+                </div>
+                <div class="modal-row">
+                    <label><input type="checkbox" id="lbl-bold"> Bold</label>
+                    <label><input type="checkbox" id="lbl-italic"> Italic</label>
+                </div>
+                <div class="modal-row" style="margin-top:10px">
+                    <button class="hud-btn reset" id="lbl-cancel">Cancel</button>
+                    <button class="hud-btn done" id="lbl-save">Create & Place</button>
+                </div>
+            </div>
+        `;
+        menu.appendChild(modal);
 
-    function uncapFPS() {
-        window.requestAnimationFrame = function (callback) {
-            return setTimeout(callback, 1);
+        modal.querySelector('#lbl-cancel').onclick = () => modal.remove();
+
+        modal.querySelector('#lbl-save').onclick = () => {
+            const text = modal.querySelector('#lbl-text').value;
+            if(!text) return;
+
+            const newLabel = {
+                id: Date.now(),
+                text: text,
+                color: modal.querySelector('#lbl-color').value,
+                bold: modal.querySelector('#lbl-bold').checked,
+                italic: modal.querySelector('#lbl-italic').checked,
+                top: '50%', left: '50%'
+            };
+
+            config.customLabels.push(newLabel);
+            saveConfig();
+            renderCustomLabels();
+            modal.remove();
+
+            const el = document.getElementById(`lbl-${newLabel.id}`);
+            enterEditMode(el, { type: 'label', id: newLabel.id }, { top: '50%', left: '50%' }, () => loadCategory('Labels'));
         };
     }
 
-    function cleanMenu() {
-        function fadeOutAndRemove(element, delay) {
-            if (element) {
-                setTimeout(() => {
-                    element.style.transition = 'opacity 0.5s';
-                    element.style.opacity = '0';
-                    setTimeout(() => {
-                        element.remove();
-                    }, 500);
-                }, delay);
-            }
-        }
 
-        function slideLeftAndCenter(element, delay) {
-            if (element) {
-                setTimeout(() => {
-                    element.style.transition = 'transform 0.5s, left 0.5s';
-                    element.style.position = 'absolute';
-                    element.style.left = '50%';
-                    element.style.transform = 'translateX(calc(-50% + 210px))';
-                }, delay);
-            }
-        }
-
-        const elementsToRemove = [
-            { selector: '#left-column', delay: 0 },
-            { selector: '#news-block', delay: 0.5 },
-            { selector: '.language-select-wrap', delay: 1 },
-            { selector: '#start-bottom-middle', delay: 1.5 },
-            { selector: '#TOS', delay: 2 },
-        ];
-
-        elementsToRemove.forEach((item, index) => {
-            const element = document.querySelector(item.selector);
-            if (element) {
-                fadeOutAndRemove(element, item.delay);
-            }
-        });
-
-        const startBottomRight = document.getElementById('start-bottom-right');
-        if (startBottomRight) {
-            slideLeftAndCenter(startBottomRight, 2.5);
+    function toggleAutoFS(enabled) {
+        config.autoFS = enabled; saveConfig();
+        if (enabled) {
+            const fs = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); window.removeEventListener('mousedown', fs); };
+            window.addEventListener('mousedown', fs);
         }
     }
 
-    document.addEventListener('keydown', function (event) {
-        if (event.key === 'Shift' && event.location === 2) {
-            if (menu && document.body.contains(menu)) {
-                menu.style.animation = 'slideOut 0.3s ease-out';
-                menu.addEventListener('animationend', () => {
-                    document.body.removeChild(menu);
-                    menu = null;
-                }, { once: true });
-            } else {
-                createMenu();
-            }
+    function toggleCleanMenu(enabled) {
+        config.cleanMenu = enabled; saveConfig();
+        const targets = ['#news-block', '#left-column', '#social-share-block', 'a[href*="privacy"]', 'a[href*="changelog"]', '.language-select-wrap'];
+        targets.forEach(s => document.querySelectorAll(s).forEach(el => enabled ? el.classList.add('nova-hidden') : el.classList.remove('nova-hidden')));
+        const bar = document.getElementById('start-bottom-right'), menu = document.getElementById('start-menu');
+        if (bar && menu) enabled ? (bar.classList.add('nova-aligned-bar'), menu.appendChild(bar)) : (bar.classList.remove('nova-aligned-bar'), document.body.appendChild(bar));
+    }
+
+
+    function loadCategory(cat) {
+        contentArea.innerHTML = `
+            <div class="cat-header">
+                <div class="cat-title">${cat}</div>
+                ${cat === 'Backgrounds' ? `
+                    <div id="shuffle-trigger" class="shuffle-btn ${config.shuffleEnabled ? 'active' : ''}" title="Auto-Shuffle Every 10 Mins">
+                        <img src="https://www.svgrepo.com/show/533712/shuffle.svg" class="shuffle-icon ${!config.glass ? 'inverted-icon' : ''}">
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        const grid = document.createElement('div');
+        grid.className = 'item-grid';
+
+        if (cat === 'Crosshairs') {
+            const addBtn = document.createElement('div');
+            addBtn.className = 'item-card add-btn';
+            addBtn.innerHTML = `<span style="font-size:30px">+</span><span class="item-name">Add Crosshair</span>`;
+            addBtn.onclick = () => {
+                const name = prompt("Name:"); if (!name) return;
+                const input = prompt("Paste Bookmarklet or Base64:"); if (!input) return;
+                config.customCrosshairs.push({ id: Date.now(), name, data: extractBase64(input) });
+                saveConfig(); loadCategory('Crosshairs');
+            };
+            grid.appendChild(addBtn);
+
+            config.customCrosshairs.forEach(xh => {
+                const card = document.createElement('div');
+                card.className = `item-card ${config.activeCrosshair === xh.id ? 'active' : ''}`;
+                card.innerHTML = `<img class="xhair-preview" src="${xh.data}"><span class="item-name">${xh.name}</span><div class="item-actions"><div class="action-btn edit">Edit</div><div class="action-btn del">Del</div></div>`;
+                card.onclick = () => { config.activeCrosshair = xh.id; saveConfig(); applyCrosshair(xh.data); loadCategory('Crosshairs'); };
+                card.querySelector('.edit').onclick = (e) => { e.stopPropagation(); const n = prompt("New Name:", xh.name); if(n) xh.name = n; saveConfig(); loadCategory('Crosshairs'); };
+                card.querySelector('.del').onclick = (e) => { e.stopPropagation(); config.customCrosshairs = config.customCrosshairs.filter(i=>i.id!==xh.id); saveConfig(); loadCategory('Crosshairs'); };
+                grid.appendChild(card);
+            });
+            contentArea.appendChild(grid);
+        } else if (cat === 'Backgrounds') {
+            const shuffleBtn = contentArea.querySelector('#shuffle-trigger');
+            shuffleBtn.onclick = () => {
+                const newState = !config.shuffleEnabled;
+                toggleShuffle(newState);
+                loadCategory('Backgrounds');
+            };
+
+            const addBtn = document.createElement('div');
+            addBtn.className = 'item-card add-btn';
+            addBtn.innerHTML = `<span style="font-size:30px">+</span><span class="item-name">Add Background</span>`;
+            addBtn.onclick = () => {
+                const choice = confirm("Press OK for URL or Cancel for File Upload");
+                const name = prompt("Name:"); if (!name) return;
+                if (choice) {
+                    const url = prompt("Paste Image URL:");
+                    if (url) { config.customBackgrounds.push({ id: Date.now(), name, data: url }); saveConfig(); loadCategory('Backgrounds'); }
+                } else {
+                    const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
+                    input.onchange = e => {
+                        const reader = new FileReader();
+                        reader.onload = () => { config.customBackgrounds.push({ id: Date.now(), name, data: reader.result }); saveConfig(); loadCategory('Backgrounds'); };
+                        reader.readAsDataURL(e.target.files[0]);
+                    };
+                    input.click();
+                }
+            };
+            grid.appendChild(addBtn);
+
+            [...defaultBackgrounds, ...config.customBackgrounds].forEach(bg => {
+                const card = document.createElement('div');
+                card.className = `item-card ${config.activeBackground === bg.id ? 'active' : ''}`;
+                card.innerHTML = `<img class="preview-img" src="${bg.data}"><span class="item-name">${bg.name}</span>`;
+                if (!bg.builtIn) {
+                    card.innerHTML += `<div class="item-actions"><div class="action-btn edit">Edit</div><div class="action-btn del">Del</div></div>`;
+                    card.querySelector('.edit').onclick = (e) => { e.stopPropagation(); const n = prompt("New Name:", bg.name); if(n) bg.name = n; saveConfig(); loadCategory('Backgrounds'); };
+                    card.querySelector('.del').onclick = (e) => { e.stopPropagation(); config.customBackgrounds = config.customBackgrounds.filter(i=>i.id!==bg.id); saveConfig(); loadCategory('Backgrounds'); };
+                }
+                card.onclick = () => { config.activeBackground = bg.id; saveConfig(); applyBackground(bg.data); loadCategory('Backgrounds'); };
+                grid.appendChild(card);
+            });
+            contentArea.appendChild(grid);
+        } else if (cat === 'Labels') {
+            // FPS
+            const fpsCard = createTweak('FPS Counter', 'fps', config.fps, toggleFPS, {
+                text: 'Move',
+                action: () => {
+                    if(!config.fps) { toggleFPS(true); config.fps=true; saveConfig(); loadCategory('Labels'); }
+                    enterEditMode(fpsDisplay, 'fpsPos', defaultConfig.fpsPos, () => loadCategory('Labels'));
+                }
+            });
+            contentArea.appendChild(fpsCard);
+
+            // Ping
+            const pingCard = createTweak('Ping / LAT Counter', 'ping', config.ping, togglePing, {
+                text: 'Move',
+                action: () => {
+                    if(!config.ping) { togglePing(true); config.ping=true; saveConfig(); loadCategory('Labels'); }
+                    enterEditMode(pingDisplay, 'pingPos', defaultConfig.pingPos, () => loadCategory('Labels'));
+                }
+            });
+            contentArea.appendChild(pingCard);
+
+            const clHeader = document.createElement('div');
+            clHeader.className = 'cat-header';
+            clHeader.style.marginTop = '20px';
+            clHeader.innerHTML = `<div class="cat-title" style="font-size:16px">Custom Labels</div>`;
+            const addLbl = document.createElement('button');
+            addLbl.className = 'move-btn';
+            addLbl.style.background = '#60cdff'; addLbl.style.color = 'black'; addLbl.style.fontWeight = 'bold';
+            addLbl.innerText = '+ Add New';
+            addLbl.onclick = openLabelCreator;
+            clHeader.appendChild(addLbl);
+            contentArea.appendChild(clHeader);
+
+            config.customLabels.forEach(lbl => {
+                const row = document.createElement('div');
+                row.className = 'tweak-card';
+                row.innerHTML = `
+                    <span style="color:${lbl.color}">${lbl.text}</span>
+                    <div>
+                        <button class="move-btn">Move</button>
+                        <button class="move-btn" style="background:rgba(255,50,50,0.3);color:#ff6b6b">Del</button>
+                    </div>
+                `;
+
+                row.querySelector('.move-btn').onclick = () => {
+                    const el = document.getElementById(`lbl-${lbl.id}`);
+                    enterEditMode(el, {type: 'label', id: lbl.id}, { top: '50%', left: '50%' }, () => loadCategory('Labels'));
+                };
+
+                row.querySelectorAll('.move-btn')[1].onclick = () => {
+                    config.customLabels = config.customLabels.filter(l => l.id !== lbl.id);
+                    saveConfig();
+                    renderCustomLabels();
+                    loadCategory('Labels');
+                };
+                contentArea.appendChild(row);
+            });
+
+        } else if (cat === 'Gameplay') {
+            contentArea.appendChild(createTweak('Uncap FPS', 'uncap', config.uncap, (v) => { config.uncap = v; saveConfig(); window.requestAnimationFrame = v ? (cb)=>setTimeout(cb,1) : originalRAF; }));
+            contentArea.appendChild(createTweak('Auto Fullscreen', 'afs', config.autoFS, toggleAutoFS));
+        } else if (cat === 'Client') {
+            contentArea.appendChild(createTweak('Glassmorphism', 'glass', config.glass, (v) => {
+                config.glass = v; saveConfig();
+                menu.classList.toggle('nova-glass', v);
+                if(document.querySelector('.nav-item.active').dataset.cat === 'Backgrounds') loadCategory('Backgrounds');
+            }));
+            contentArea.appendChild(createTweak('Fast Menu', 'fast', config.fastMenu, (v) => { config.fastMenu = v; saveConfig(); menu.classList.toggle('nova-animate', !v); }));
+        } else if (cat === 'Misc') {
+            contentArea.appendChild(createTweak('Clean Menu', 'clean', config.cleanMenu, toggleCleanMenu));
         }
+    }
+
+    function createTweak(name, id, checked, callback, extraBtn = null) {
+        const card = document.createElement('div');
+        card.className = 'tweak-card';
+        let html = `<span>${name}</span>`;
+        html += `<div style="display:flex; align-items:center;">`;
+        if (extraBtn) html += `<button class="move-btn">${extraBtn.text}</button>`;
+        html += `<label class="win-switch"><input type="checkbox" ${checked ? 'checked' : ''}><span class="win-slider"></span></label></div>`;
+
+        card.innerHTML = html;
+        card.querySelector('input').onchange = (e) => callback(e.target.checked);
+        if (extraBtn) card.querySelector('.move-btn').onclick = extraBtn.action;
+        return card;
+    }
+
+    const menu = document.createElement('div');
+    menu.id = 'nova-menu';
+    menu.innerHTML = `
+        <div id="nova-header"><span>Nova Client</span><div id="nova-close" style="cursor:pointer">&times;</div></div>
+        <div id="nova-nav">
+            <div class="nav-item active" data-cat="Labels">Labels</div>
+            <div class="nav-item" data-cat="Gameplay">Gameplay</div>
+            <div class="nav-item" data-cat="Crosshairs">Crosshairs</div>
+            <div class="nav-item" data-cat="Backgrounds">Backgrounds</div>
+            <div class="nav-item" data-cat="Client">Client</div>
+            <div class="nav-item" data-cat="Misc">Misc</div>
+        </div>
+    `;
+    const contentArea = document.createElement('div');
+    contentArea.id = 'nova-content';
+    menu.appendChild(contentArea);
+    document.body.appendChild(menu);
+
+    const toggleMenu = (open) => {
+        if (open) { menu.style.display = 'flex'; setTimeout(() => menu.classList.add('active'), 10); }
+        else { menu.classList.remove('active'); setTimeout(() => { if (!menu.classList.contains('active')) menu.style.display = 'none'; }, config.fastMenu ? 0 : 400); }
+    };
+
+    window.onkeydown = (e) => { if (e.code === 'ShiftRight') toggleMenu(!menu.classList.contains('active')); };
+    document.getElementById('nova-close').onclick = () => toggleMenu(false);
+    menu.querySelectorAll('.nav-item').forEach(item => {
+        item.onclick = () => {
+            menu.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active'); loadCategory(item.dataset.cat);
+        };
     });
+
+    let drag = false, ox, oy;
+    document.getElementById('nova-header').onmousedown = (e) => { drag = true; ox = e.clientX - menu.offsetLeft; oy = e.clientY - menu.offsetTop; };
+    document.onmousemove = (e) => { if (drag) { menu.style.left = (e.clientX - ox + menu.offsetWidth/2) + 'px'; menu.style.top = (e.clientY - oy + menu.offsetHeight/2) + 'px'; } };
+    document.onmouseup = () => drag = false;
+
+    loadCategory('Labels');
+    if (config.fps) toggleFPS(true);
+    if (config.ping) togglePing(true);
+    if (config.uncap) window.requestAnimationFrame = (cb)=>setTimeout(cb,1);
+    if (config.cleanMenu) toggleCleanMenu(true);
+    if (config.autoFS) toggleAutoFS(true);
+    if (config.shuffleEnabled) toggleShuffle(true);
+    renderCustomLabels();
+
+    if (config.activeCrosshair) {
+        const x = config.customCrosshairs.find(i => i.id === config.activeCrosshair);
+        if (x) applyCrosshair(x.data);
+    }
+    if (config.activeBackground) {
+        const b = [...defaultBackgrounds, ...config.customBackgrounds].find(i => i.id === config.activeBackground);
+        if (b) {
+            const bgEl = document.querySelector("#background");
+            if (bgEl) bgEl.style.backgroundImage = `url("${b.data}")`;
+        }
+    }
+    menu.classList.toggle('nova-glass', config.glass);
+    menu.classList.toggle('nova-animate', !config.fastMenu);
 })();
