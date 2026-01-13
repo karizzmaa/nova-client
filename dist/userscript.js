@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Nova Client
 // @namespace    https://github.com/karizzmaa/nova-client/
-// @version      2.0
-// @description  Customizable Mod menu for Survev.io
+// @version      2.1
+// @description  Customizable Mod menu for Survev.io.
 // @author       karizzmaa
 // @match        *://survev.io/*
 // @match        *://66.179.254.36/*
 // @match        *://185.126.158.61/*
 // @match        *://resurviv.biz/*
-// @match        *://leia-uwu.github.io/survev/*
+// @match        *://survev.github.io/survev/*
 // @match        *://survev.leia-is.gay/*
 // @match        *://survivx.org/*
 // @match        *://kxs.rip/*
@@ -20,6 +20,12 @@
 // @match        *://cursev.io/*
 // @match        *://eu-comp.zurviv.io/*
 // @match        *://uno.cheap/*
+// @exclude      https://survev.io/stats/
+// @exclude      https://survev.io/changelog
+// @exclude      https://survev.io/privacy
+// @exclude      https://survev.io/changelogRec
+// @exclude      https://survev.io/hof
+// @exclude      https://survev.io/attribution.txt
 // @grant        GM_addStyle
 // @icon         https://raw.githubusercontent.com/karizzmaa/nova-client/refs/heads/main/icon.png
 // ==/UserScript==
@@ -40,24 +46,30 @@
         fps: false, ping: false, uncap: false, glass: true, fastMenu: false, cleanMenu: false, autoFS: false,
         activeCrosshair: null, customCrosshairs: [],
         activeBackground: 'b10', customBackgrounds: [],
+        activeKeybindId: null, customKeybinds: [],
         shuffleEnabled: false,
-
         fpsPos: { top: '60%', left: '10px' },
         pingPos: { top: '65%', left: '10px' },
         customLabels: []
     };
 
     let config = JSON.parse(localStorage.getItem('nova_config')) || defaultConfig;
-
     config = { ...defaultConfig, ...config };
 
     if(!config.fpsPos) config.fpsPos = defaultConfig.fpsPos;
     if(!config.pingPos) config.pingPos = defaultConfig.pingPos;
     if(!config.customLabels) config.customLabels = [];
+    if(!config.customKeybinds) config.customKeybinds = [];
 
     let shuffleInterval = null;
 
     function saveConfig() { localStorage.setItem('nova_config', JSON.stringify(config)); }
+
+    function updateGameKeybinds(bindString) {
+        let gameConfig = JSON.parse(localStorage.getItem('surviv_config')) || {};
+        gameConfig.binds = bindString;
+        localStorage.setItem('surviv_config', JSON.stringify(gameConfig));
+    }
 
     let fpsDisplay = null;
     let fpsAnimationId = null;
@@ -115,36 +127,22 @@
         input:checked + .win-slider:before { transform: translateX(20px); background-color: #000; }
         .nova-hidden { display: none !important; }
         .nova-aligned-bar { position: relative !important; margin-top: 60px !important; display: flex !important; justify-content: center !important; }
-
-        /* New Styles for v2.1 */
         .move-btn { margin-right: 10px; background: rgba(255,255,255,0.1); border:none; color:white; border-radius:4px; padding: 4px 8px; cursor: pointer; transition:0.2s; font-size:11px;}
         .move-btn:hover { background: #60cdff; color:black; }
-
-        #edit-hud {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(20,20,20,0.9); border: 1px solid rgba(255,255,255,0.2);
-            padding: 10px 20px; border-radius: 30px; display: none; gap: 10px;
-            z-index: 10002; backdrop-filter: blur(10px);
-        }
+        #edit-hud { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(20,20,20,0.9); border: 1px solid rgba(255,255,255,0.2); padding: 10px 20px; border-radius: 30px; display: none; gap: 10px; z-index: 10002; backdrop-filter: blur(10px); }
         .hud-btn { padding: 8px 20px; border-radius: 20px; border:none; cursor:pointer; font-weight:600; }
         .hud-btn.reset { background: rgba(255,50,50,0.2); color: #ff6b6b; }
         .hud-btn.done { background: #60cdff; color: black; }
-
         .nova-label { position: fixed; color: white; font-size: 14px; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.3); padding: 3px 8px; border-radius: 5px; z-index: 10001; pointer-events: none; user-select: none; }
         .draggable { pointer-events: auto !important; cursor: grab; border: 2px dashed #60cdff; background: rgba(96,205,255,0.2) !important; }
         .draggable:active { cursor: grabbing; }
-
-        /* Modal specific */
-        .nova-modal {
-            position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8);
-            display:flex; justify-content:center; align-items:center; z-index: 10;
-        }
+        .nova-modal { position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; justify-content:center; align-items:center; z-index: 10; }
         .modal-box { background: #1a1a1a; padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); width: 300px; display:flex; flex-direction:column; gap:10px; }
         .modal-input { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 8px; border-radius: 4px; outline: none; }
         .modal-row { display: flex; justify-content: space-between; align-items: center; }
         .color-picker { width: 50px; height: 30px; border: none; cursor: pointer; }
+        .bind-icon { width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.7; }
     `);
-
 
     function applyCrosshair(base64) {
         const target = document.querySelector("#game-area-wrapper") || document.querySelector("canvas");
@@ -185,8 +183,6 @@
         return match ? match[0] : input;
     }
 
-s
-
     const editHud = document.createElement('div');
     editHud.id = 'edit-hud';
     editHud.innerHTML = `<button class="hud-btn reset">Reset</button><button class="hud-btn done">Done</button>`;
@@ -194,74 +190,36 @@ s
 
     function enterEditMode(element, configKey, defaultPos, onDone) {
         if (!element) return;
-
         toggleMenu(false);
         editHud.style.display = 'flex';
         element.classList.add('draggable');
-
         let isDragging = false;
         let startX, startY, initialLeft, initialTop;
-
-        const onMouseDown = (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            initialLeft = element.offsetLeft;
-            initialTop = element.offsetTop;
-            e.preventDefault();
-        };
-
-        const onMouseMove = (e) => {
-            if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            element.style.left = `${initialLeft + dx}px`;
-            element.style.top = `${initialTop + dy}px`;
-            element.style.transform = 'none'; // remove center transforms if any
-        };
-
+        const onMouseDown = (e) => { isDragging = true; startX = e.clientX; startY = e.clientY; initialLeft = element.offsetLeft; initialTop = element.offsetTop; e.preventDefault(); };
+        const onMouseMove = (e) => { if (!isDragging) return; const dx = e.clientX - startX; const dy = e.clientY - startY; element.style.left = `${initialLeft + dx}px`; element.style.top = `${initialTop + dy}px`; element.style.transform = 'none'; };
         const onMouseUp = () => { isDragging = false; };
-
         element.addEventListener('mousedown', onMouseDown);
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
-
-
-        editHud.querySelector('.reset').onclick = () => {
-            element.style.top = defaultPos.top;
-            element.style.left = defaultPos.left;
-            if(defaultPos.top.includes('%')) element.style.transform = 'translateY(-50%)';
-        };
-
-
+        editHud.querySelector('.reset').onclick = () => { element.style.top = defaultPos.top; element.style.left = defaultPos.left; if(defaultPos.top.includes('%')) element.style.transform = 'translateY(-50%)'; };
         editHud.querySelector('.done').onclick = () => {
-
             if (configKey) {
-
-                if (typeof configKey === 'string') {
-                    config[configKey] = { top: element.style.top, left: element.style.left };
-                } else if (typeof configKey === 'object' && configKey.type === 'label') {
+                if (typeof configKey === 'string') { config[configKey] = { top: element.style.top, left: element.style.left }; }
+                else if (typeof configKey === 'object' && configKey.type === 'label') {
                     const lbl = config.customLabels.find(l => l.id === configKey.id);
-                    if(lbl) {
-                        lbl.top = element.style.top;
-                        lbl.left = element.style.left;
-                    }
+                    if(lbl) { lbl.top = element.style.top; lbl.left = element.style.left; }
                 }
                 saveConfig();
             }
-
-
             element.classList.remove('draggable');
             element.removeEventListener('mousedown', onMouseDown);
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
             editHud.style.display = 'none';
-
             toggleMenu(true);
             if(onDone) onDone();
         };
     }
-
 
     function toggleFPS(enabled) {
         config.fps = enabled; saveConfig();
@@ -271,7 +229,6 @@ s
             fpsDisplay.style.top = config.fpsPos.top;
             fpsDisplay.style.left = config.fpsPos.left;
             if(config.fpsPos.top.includes('%')) fpsDisplay.style.transform = 'translateY(-50%)';
-
             document.body.appendChild(fpsDisplay);
             let times = [];
             const run = () => {
@@ -295,7 +252,6 @@ s
             pingDisplay.style.top = config.pingPos.top;
             pingDisplay.style.left = config.pingPos.left;
             if(config.pingPos.top.includes('%')) pingDisplay.style.transform = 'translateY(-50%)';
-
             document.body.appendChild(pingDisplay);
             initPingSocket();
         } else if (!enabled && pingDisplay) {
@@ -311,12 +267,10 @@ s
             const map = { na: 'usr', eu: 'eur', asia: 'asr', sa: 'sa' };
             return `wss://${map[reg] || 'usr'}.mathsiscoolfun.com:8001/ptc`;
         };
-
         const startPing = () => {
             if (ws) ws.close();
             ws = new WebSocket(getWsUrl());
             let sendTime;
-
             ws.onopen = () => { ws.send(new ArrayBuffer(1)); sendTime = Date.now(); };
             ws.onmessage = () => {
                 const diff = Date.now() - sendTime;
@@ -324,26 +278,16 @@ s
                     pingDisplay.innerHTML = `Ping: ${diff} ms`;
                     pingDisplay.style.color = diff > 120 ? "#ff4d4d" : (diff > 80 ? "#ffa500" : "white");
                 }
-                setTimeout(() => {
-                    if (ws && ws.readyState === 1) { sendTime = Date.now(); ws.send(new ArrayBuffer(1)); }
-                }, 1500);
+                setTimeout(() => { if (ws && ws.readyState === 1) { sendTime = Date.now(); ws.send(new ArrayBuffer(1)); } }, 1500);
             };
             ws.onclose = () => { if (config.ping && pingDisplay) pingDisplay.innerHTML = "Ping: Offline"; };
             ws.onerror = () => { if (pingDisplay) pingDisplay.innerHTML = "Ping: Error"; };
         };
-
-        document.addEventListener('click', (e) => {
-            if (e.target.classList?.contains('btn-green') || e.target.id === 'btn-start-team') {
-                setTimeout(startPing, 1000);
-            }
-        });
+        document.addEventListener('click', (e) => { if (e.target.classList?.contains('btn-green') || e.target.id === 'btn-start-team') { setTimeout(startPing, 1000); } });
     }
-
-    // custom labels ye
 
     function renderCustomLabels() {
         document.querySelectorAll('.nova-custom-lbl').forEach(e => e.remove());
-
         config.customLabels.forEach(lbl => {
             const el = document.createElement('div');
             el.className = 'nova-label nova-custom-lbl';
@@ -365,47 +309,25 @@ s
             <div class="modal-box">
                 <h3 style="margin:0">Create Label</h3>
                 <input class="modal-input" type="text" id="lbl-text" placeholder="Label Text (e.g. Nickname)">
-                <div class="modal-row">
-                    <span>Color:</span>
-                    <input type="color" id="lbl-color" value="#ffffff" class="color-picker">
-                </div>
-                <div class="modal-row">
-                    <label><input type="checkbox" id="lbl-bold"> Bold</label>
-                    <label><input type="checkbox" id="lbl-italic"> Italic</label>
-                </div>
-                <div class="modal-row" style="margin-top:10px">
-                    <button class="hud-btn reset" id="lbl-cancel">Cancel</button>
-                    <button class="hud-btn done" id="lbl-save">Create & Place</button>
-                </div>
+                <div class="modal-row"><span>Color:</span><input type="color" id="lbl-color" value="#ffffff" class="color-picker"></div>
+                <div class="modal-row"><label><input type="checkbox" id="lbl-bold"> Bold</label><label><input type="checkbox" id="lbl-italic"> Italic</label></div>
+                <div class="modal-row" style="margin-top:10px"><button class="hud-btn reset" id="lbl-cancel">Cancel</button><button class="hud-btn done" id="lbl-save">Create & Place</button></div>
             </div>
         `;
         menu.appendChild(modal);
-
         modal.querySelector('#lbl-cancel').onclick = () => modal.remove();
-
         modal.querySelector('#lbl-save').onclick = () => {
             const text = modal.querySelector('#lbl-text').value;
             if(!text) return;
-
-            const newLabel = {
-                id: Date.now(),
-                text: text,
-                color: modal.querySelector('#lbl-color').value,
-                bold: modal.querySelector('#lbl-bold').checked,
-                italic: modal.querySelector('#lbl-italic').checked,
-                top: '50%', left: '50%'
-            };
-
+            const newLabel = { id: Date.now(), text, color: modal.querySelector('#lbl-color').value, bold: modal.querySelector('#lbl-bold').checked, italic: modal.querySelector('#lbl-italic').checked, top: '50%', left: '50%' };
             config.customLabels.push(newLabel);
             saveConfig();
             renderCustomLabels();
             modal.remove();
-
             const el = document.getElementById(`lbl-${newLabel.id}`);
             enterEditMode(el, { type: 'label', id: newLabel.id }, { top: '50%', left: '50%' }, () => loadCategory('Labels'));
         };
     }
-
 
     function toggleAutoFS(enabled) {
         config.autoFS = enabled; saveConfig();
@@ -419,10 +341,9 @@ s
         config.cleanMenu = enabled; saveConfig();
         const targets = ['#news-block', '#left-column', '#social-share-block', 'a[href*="privacy"]', 'a[href*="changelog"]', '.language-select-wrap'];
         targets.forEach(s => document.querySelectorAll(s).forEach(el => enabled ? el.classList.add('nova-hidden') : el.classList.remove('nova-hidden')));
-        const bar = document.getElementById('start-bottom-right'), menu = document.getElementById('start-menu');
-        if (bar && menu) enabled ? (bar.classList.add('nova-aligned-bar'), menu.appendChild(bar)) : (bar.classList.remove('nova-aligned-bar'), document.body.appendChild(bar));
+        const bar = document.getElementById('start-bottom-right'), menuEl = document.getElementById('start-menu');
+        if (bar && menuEl) enabled ? (bar.classList.add('nova-aligned-bar'), menuEl.appendChild(bar)) : (bar.classList.remove('nova-aligned-bar'), document.body.appendChild(bar));
     }
-
 
     function loadCategory(cat) {
         contentArea.innerHTML = `
@@ -449,7 +370,6 @@ s
                 saveConfig(); loadCategory('Crosshairs');
             };
             grid.appendChild(addBtn);
-
             config.customCrosshairs.forEach(xh => {
                 const card = document.createElement('div');
                 card.className = `item-card ${config.activeCrosshair === xh.id ? 'active' : ''}`;
@@ -460,35 +380,55 @@ s
                 grid.appendChild(card);
             });
             contentArea.appendChild(grid);
+        } else if (cat === 'Keybinds') {
+            const addBtn = document.createElement('div');
+            addBtn.className = 'item-card add-btn';
+            addBtn.innerHTML = `<span style="font-size:30px">+</span><span class="item-name">Add Profile</span>`;
+            addBtn.onclick = () => {
+                const name = prompt("Profile Name:"); if (!name) return;
+                const bindStr = prompt("Paste Keybind String"); if (!bindStr) return;
+                config.customKeybinds.push({ id: Date.now(), name, data: bindStr });
+                saveConfig(); loadCategory('Keybinds');
+            };
+            grid.appendChild(addBtn);
+            config.customKeybinds.forEach(kb => {
+                const card = document.createElement('div');
+                card.className = `item-card ${config.activeKeybindId === kb.id ? 'active' : ''}`;
+                card.innerHTML = `<img class="bind-icon" src="https://www.svgrepo.com/show/347645/keyboard.svg" style="${!config.glass ? 'filter:invert(1)' : ''}"><span class="item-name">${kb.name}</span><div class="item-actions"><div class="action-btn edit">Edit</div><div class="action-btn del">Del</div></div>`;
+                card.onclick = () => {
+                    config.activeKeybindId = kb.id;
+                    saveConfig();
+                    updateGameKeybinds(kb.data);
+                    alert(`Applied Keybind Profile: ${kb.name}`);
+                    loadCategory('Keybinds');
+                };
+                card.querySelector('.edit').onclick = (e) => {
+                    e.stopPropagation();
+                    const n = prompt("New Name:", kb.name); if(n) kb.name = n;
+                    const d = prompt("New Bind String:", kb.data); if(d) kb.data = d;
+                    saveConfig(); loadCategory('Keybinds');
+                };
+                card.querySelector('.del').onclick = (e) => { e.stopPropagation(); config.customKeybinds = config.customKeybinds.filter(i=>i.id!==kb.id); saveConfig(); loadCategory('Keybinds'); };
+                grid.appendChild(card);
+            });
+            contentArea.appendChild(grid);
         } else if (cat === 'Backgrounds') {
             const shuffleBtn = contentArea.querySelector('#shuffle-trigger');
-            shuffleBtn.onclick = () => {
-                const newState = !config.shuffleEnabled;
-                toggleShuffle(newState);
-                loadCategory('Backgrounds');
-            };
-
+            shuffleBtn.onclick = () => { const newState = !config.shuffleEnabled; toggleShuffle(newState); loadCategory('Backgrounds'); };
             const addBtn = document.createElement('div');
             addBtn.className = 'item-card add-btn';
             addBtn.innerHTML = `<span style="font-size:30px">+</span><span class="item-name">Add Background</span>`;
             addBtn.onclick = () => {
                 const choice = confirm("Press OK for URL or Cancel for File Upload");
                 const name = prompt("Name:"); if (!name) return;
-                if (choice) {
-                    const url = prompt("Paste Image URL:");
-                    if (url) { config.customBackgrounds.push({ id: Date.now(), name, data: url }); saveConfig(); loadCategory('Backgrounds'); }
-                } else {
+                if (choice) { const url = prompt("Paste Image URL:"); if (url) { config.customBackgrounds.push({ id: Date.now(), name, data: url }); saveConfig(); loadCategory('Backgrounds'); } }
+                else {
                     const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*';
-                    input.onchange = e => {
-                        const reader = new FileReader();
-                        reader.onload = () => { config.customBackgrounds.push({ id: Date.now(), name, data: reader.result }); saveConfig(); loadCategory('Backgrounds'); };
-                        reader.readAsDataURL(e.target.files[0]);
-                    };
+                    input.onchange = e => { const reader = new FileReader(); reader.onload = () => { config.customBackgrounds.push({ id: Date.now(), name, data: reader.result }); saveConfig(); loadCategory('Backgrounds'); }; reader.readAsDataURL(e.target.files[0]); };
                     input.click();
                 }
             };
             grid.appendChild(addBtn);
-
             [...defaultBackgrounds, ...config.customBackgrounds].forEach(bg => {
                 const card = document.createElement('div');
                 card.className = `item-card ${config.activeBackground === bg.id ? 'active' : ''}`;
@@ -503,72 +443,22 @@ s
             });
             contentArea.appendChild(grid);
         } else if (cat === 'Labels') {
-            // FPS
-            const fpsCard = createTweak('FPS Counter', 'fps', config.fps, toggleFPS, {
-                text: 'Move',
-                action: () => {
-                    if(!config.fps) { toggleFPS(true); config.fps=true; saveConfig(); loadCategory('Labels'); }
-                    enterEditMode(fpsDisplay, 'fpsPos', defaultConfig.fpsPos, () => loadCategory('Labels'));
-                }
-            });
-            contentArea.appendChild(fpsCard);
-
-            // Ping
-            const pingCard = createTweak('Ping / LAT Counter', 'ping', config.ping, togglePing, {
-                text: 'Move',
-                action: () => {
-                    if(!config.ping) { togglePing(true); config.ping=true; saveConfig(); loadCategory('Labels'); }
-                    enterEditMode(pingDisplay, 'pingPos', defaultConfig.pingPos, () => loadCategory('Labels'));
-                }
-            });
-            contentArea.appendChild(pingCard);
-
-            const clHeader = document.createElement('div');
-            clHeader.className = 'cat-header';
-            clHeader.style.marginTop = '20px';
-            clHeader.innerHTML = `<div class="cat-title" style="font-size:16px">Custom Labels</div>`;
-            const addLbl = document.createElement('button');
-            addLbl.className = 'move-btn';
-            addLbl.style.background = '#60cdff'; addLbl.style.color = 'black'; addLbl.style.fontWeight = 'bold';
-            addLbl.innerText = '+ Add New';
-            addLbl.onclick = openLabelCreator;
-            clHeader.appendChild(addLbl);
-            contentArea.appendChild(clHeader);
-
+            contentArea.appendChild(createTweak('FPS Counter', 'fps', config.fps, toggleFPS, { text: 'Move', action: () => { if(!config.fps) { toggleFPS(true); config.fps=true; saveConfig(); loadCategory('Labels'); } enterEditMode(fpsDisplay, 'fpsPos', defaultConfig.fpsPos, () => loadCategory('Labels')); } }));
+            contentArea.appendChild(createTweak('Ping / LAT Counter', 'ping', config.ping, togglePing, { text: 'Move', action: () => { if(!config.ping) { togglePing(true); config.ping=true; saveConfig(); loadCategory('Labels'); } enterEditMode(pingDisplay, 'pingPos', defaultConfig.pingPos, () => loadCategory('Labels')); } }));
+            const clHeader = document.createElement('div'); clHeader.className = 'cat-header'; clHeader.style.marginTop = '20px'; clHeader.innerHTML = `<div class="cat-title" style="font-size:16px">Custom Labels</div>`;
+            const addLbl = document.createElement('button'); addLbl.className = 'move-btn'; addLbl.style.background = '#60cdff'; addLbl.style.color = 'black'; addLbl.style.fontWeight = 'bold'; addLbl.innerText = '+ Add New'; addLbl.onclick = openLabelCreator;
+            clHeader.appendChild(addLbl); contentArea.appendChild(clHeader);
             config.customLabels.forEach(lbl => {
-                const row = document.createElement('div');
-                row.className = 'tweak-card';
-                row.innerHTML = `
-                    <span style="color:${lbl.color}">${lbl.text}</span>
-                    <div>
-                        <button class="move-btn">Move</button>
-                        <button class="move-btn" style="background:rgba(255,50,50,0.3);color:#ff6b6b">Del</button>
-                    </div>
-                `;
-
-                row.querySelector('.move-btn').onclick = () => {
-                    const el = document.getElementById(`lbl-${lbl.id}`);
-                    enterEditMode(el, {type: 'label', id: lbl.id}, { top: '50%', left: '50%' }, () => loadCategory('Labels'));
-                };
-
-                row.querySelectorAll('.move-btn')[1].onclick = () => {
-                    config.customLabels = config.customLabels.filter(l => l.id !== lbl.id);
-                    saveConfig();
-                    renderCustomLabels();
-                    loadCategory('Labels');
-                };
+                const row = document.createElement('div'); row.className = 'tweak-card'; row.innerHTML = `<span style="color:${lbl.color}">${lbl.text}</span><div><button class="move-btn">Move</button><button class="move-btn" style="background:rgba(255,50,50,0.3);color:#ff6b6b">Del</button></div>`;
+                row.querySelector('.move-btn').onclick = () => { const el = document.getElementById(`lbl-${lbl.id}`); enterEditMode(el, {type: 'label', id: lbl.id}, { top: '50%', left: '50%' }, () => loadCategory('Labels')); };
+                row.querySelectorAll('.move-btn')[1].onclick = () => { config.customLabels = config.customLabels.filter(l => l.id !== lbl.id); saveConfig(); renderCustomLabels(); loadCategory('Labels'); };
                 contentArea.appendChild(row);
             });
-
         } else if (cat === 'Gameplay') {
             contentArea.appendChild(createTweak('Uncap FPS', 'uncap', config.uncap, (v) => { config.uncap = v; saveConfig(); window.requestAnimationFrame = v ? (cb)=>setTimeout(cb,1) : originalRAF; }));
             contentArea.appendChild(createTweak('Auto Fullscreen', 'afs', config.autoFS, toggleAutoFS));
         } else if (cat === 'Client') {
-            contentArea.appendChild(createTweak('Glassmorphism', 'glass', config.glass, (v) => {
-                config.glass = v; saveConfig();
-                menu.classList.toggle('nova-glass', v);
-                if(document.querySelector('.nav-item.active').dataset.cat === 'Backgrounds') loadCategory('Backgrounds');
-            }));
+            contentArea.appendChild(createTweak('Glassmorphism', 'glass', config.glass, (v) => { config.glass = v; saveConfig(); menu.classList.toggle('nova-glass', v); if(document.querySelector('.nav-item.active').dataset.cat === 'Backgrounds') loadCategory('Backgrounds'); }));
             contentArea.appendChild(createTweak('Fast Menu', 'fast', config.fastMenu, (v) => { config.fastMenu = v; saveConfig(); menu.classList.toggle('nova-animate', !v); }));
         } else if (cat === 'Misc') {
             contentArea.appendChild(createTweak('Clean Menu', 'clean', config.cleanMenu, toggleCleanMenu));
@@ -576,36 +466,30 @@ s
     }
 
     function createTweak(name, id, checked, callback, extraBtn = null) {
-        const card = document.createElement('div');
-        card.className = 'tweak-card';
-        let html = `<span>${name}</span>`;
-        html += `<div style="display:flex; align-items:center;">`;
+        const card = document.createElement('div'); card.className = 'tweak-card';
+        let html = `<span>${name}</span><div style="display:flex; align-items:center;">`;
         if (extraBtn) html += `<button class="move-btn">${extraBtn.text}</button>`;
         html += `<label class="win-switch"><input type="checkbox" ${checked ? 'checked' : ''}><span class="win-slider"></span></label></div>`;
-
-        card.innerHTML = html;
-        card.querySelector('input').onchange = (e) => callback(e.target.checked);
+        card.innerHTML = html; card.querySelector('input').onchange = (e) => callback(e.target.checked);
         if (extraBtn) card.querySelector('.move-btn').onclick = extraBtn.action;
         return card;
     }
 
-    const menu = document.createElement('div');
-    menu.id = 'nova-menu';
+    const menu = document.createElement('div'); menu.id = 'nova-menu';
     menu.innerHTML = `
         <div id="nova-header"><span>Nova Client</span><div id="nova-close" style="cursor:pointer">&times;</div></div>
         <div id="nova-nav">
             <div class="nav-item active" data-cat="Labels">Labels</div>
             <div class="nav-item" data-cat="Gameplay">Gameplay</div>
+            <div class="nav-item" data-cat="Keybinds">Keybinds</div>
             <div class="nav-item" data-cat="Crosshairs">Crosshairs</div>
             <div class="nav-item" data-cat="Backgrounds">Backgrounds</div>
             <div class="nav-item" data-cat="Client">Client</div>
             <div class="nav-item" data-cat="Misc">Misc</div>
         </div>
     `;
-    const contentArea = document.createElement('div');
-    contentArea.id = 'nova-content';
-    menu.appendChild(contentArea);
-    document.body.appendChild(menu);
+    const contentArea = document.createElement('div'); contentArea.id = 'nova-content';
+    menu.appendChild(contentArea); document.body.appendChild(menu);
 
     const toggleMenu = (open) => {
         if (open) { menu.style.display = 'flex'; setTimeout(() => menu.classList.add('active'), 10); }
@@ -614,12 +498,7 @@ s
 
     window.onkeydown = (e) => { if (e.code === 'ShiftRight') toggleMenu(!menu.classList.contains('active')); };
     document.getElementById('nova-close').onclick = () => toggleMenu(false);
-    menu.querySelectorAll('.nav-item').forEach(item => {
-        item.onclick = () => {
-            menu.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            item.classList.add('active'); loadCategory(item.dataset.cat);
-        };
-    });
+    menu.querySelectorAll('.nav-item').forEach(item => { item.onclick = () => { menu.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active')); item.classList.add('active'); loadCategory(item.dataset.cat); }; });
 
     let drag = false, ox, oy;
     document.getElementById('nova-header').onmousedown = (e) => { drag = true; ox = e.clientX - menu.offsetLeft; oy = e.clientY - menu.offsetTop; };
@@ -635,16 +514,10 @@ s
     if (config.shuffleEnabled) toggleShuffle(true);
     renderCustomLabels();
 
-    if (config.activeCrosshair) {
-        const x = config.customCrosshairs.find(i => i.id === config.activeCrosshair);
-        if (x) applyCrosshair(x.data);
-    }
+    if (config.activeCrosshair) { const x = config.customCrosshairs.find(i => i.id === config.activeCrosshair); if (x) applyCrosshair(x.data); }
     if (config.activeBackground) {
         const b = [...defaultBackgrounds, ...config.customBackgrounds].find(i => i.id === config.activeBackground);
-        if (b) {
-            const bgEl = document.querySelector("#background");
-            if (bgEl) bgEl.style.backgroundImage = `url("${b.data}")`;
-        }
+        if (b) { const bgEl = document.querySelector("#background"); if (bgEl) bgEl.style.backgroundImage = `url("${b.data}")`; }
     }
     menu.classList.toggle('nova-glass', config.glass);
     menu.classList.toggle('nova-animate', !config.fastMenu);
