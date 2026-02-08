@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Client
 // @namespace    https://github.com/karizzmaa/nova-client/
-// @version      2.1
+// @version      2.1.1
 // @description  Customizable Mod menu for Survev.io.
 // @author       karizzmaa
 // @match        *://survev.io/*
@@ -43,10 +43,21 @@
     ];
 
     const defaultConfig = {
-        fps: false, ping: false, uncap: false, glass: true, fastMenu: false, cleanMenu: false, autoFS: false,
-        activeCrosshair: null, customCrosshairs: [],
-        activeBackground: 'b10', customBackgrounds: [],
-        activeKeybindId: null, customKeybinds: [],
+        fps: false,
+        ping: false,
+        uncap: false,
+        glass: true,
+        fastMenu: false,
+        cleanMenu: false,
+        hideAccountBlock: false,
+        useClassicLogo: false,
+        autoFS: false,
+        activeCrosshair: null,
+        customCrosshairs: [],
+        activeBackground: 'b10',
+        customBackgrounds: [],
+        activeKeybindId: null,
+        customKeybinds: [],
         shuffleEnabled: false,
         fpsPos: { top: '60%', left: '10px' },
         pingPos: { top: '65%', left: '10px' },
@@ -112,7 +123,6 @@
         .shuffle-btn.active { background: #60cdff; }
         .shuffle-icon { width: 100%; height: 100%; transition: filter 0.3s; }
         .inverted-icon { filter: invert(1); }
-        #background { transition: opacity 0.8s ease-in-out; }
         .add-btn { border: 2px dashed rgba(255,255,255,0.2); background: transparent; }
         .item-actions { position: absolute; top: 5px; right: 5px; display: flex; gap: 4px; opacity: 0; transition: 0.2s; }
         .item-card:hover .item-actions { opacity: 1; }
@@ -142,22 +152,56 @@
         .modal-row { display: flex; justify-content: space-between; align-items: center; }
         .color-picker { width: 50px; height: 30px; border: none; cursor: pointer; }
         .bind-icon { width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.7; }
+        .nova-clean-centered {   left: 50% !important;    right: auto !important;    transform: translateX(-50%) !important; display: flex !important;    justify-content: center !important;    align-items: center !important;
+}
+
     `);
+
+    const glassStyleId = 'glassmorphism-start-menu-bg-only';
+    const glassCSS = `
+        #start-menu{
+            background:rgba(25,25,25,.45)!important;
+            backdrop-filter:blur(14px)saturate(130%);
+            -webkit-backdrop-filter:blur(14px)saturate(130%);
+            border-radius:18px;
+            border:1px solid rgba(255,255,255,.15);
+            box-shadow:0 8px 30px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.04)
+        }
+        #start-menu *{
+            backdrop-filter:none!important;
+            -webkit-backdrop-filter:none!important
+        }`;
+
+    function toggleGlassStyle(enabled) {
+        let existing = document.getElementById(glassStyleId);
+        if (enabled) {
+            if (!existing) {
+                const s = document.createElement('style');
+                s.id = glassStyleId;
+                s.textContent = glassCSS;
+                document.head.appendChild(s);
+            }
+        } else {
+            if (existing) existing.remove();
+        }
+    }
+
+    new MutationObserver(() => {
+        if (config.glass && document.querySelector('#start-menu')) {
+            toggleGlassStyle(true);
+        }
+    }).observe(document.documentElement, { childList: true, subtree: true });
 
     function applyCrosshair(base64) {
         const target = document.querySelector("#game-area-wrapper") || document.querySelector("canvas");
         if (target) target.style.cursor = `url(${base64}) 16 16, auto`;
     }
 
-    function applyBackground(url) {
-        const bg = document.querySelector("#background");
-        if (!bg) return;
-        bg.style.opacity = "0";
-        setTimeout(() => {
-            bg.style.backgroundImage = `url("${url}")`;
-            bg.style.opacity = "1";
-        }, 800);
-    }
+function applyBackground(url) {
+    const bg = document.querySelector("#background");
+    if (!bg) return;
+    bg.style.backgroundImage = `url("${url}")`;
+}
 
     function doShuffle() {
         const pool = [...defaultBackgrounds, ...config.customBackgrounds];
@@ -337,14 +381,78 @@
         }
     }
 
-    function toggleCleanMenu(enabled) {
-        config.cleanMenu = enabled; saveConfig();
-        const targets = ['#news-block', '#left-column', '#social-share-block', 'a[href*="privacy"]', 'a[href*="changelog"]', '.language-select-wrap'];
-        targets.forEach(s => document.querySelectorAll(s).forEach(el => enabled ? el.classList.add('nova-hidden') : el.classList.remove('nova-hidden')));
-        const bar = document.getElementById('start-bottom-right'), menuEl = document.getElementById('start-menu');
-        if (bar && menuEl) enabled ? (bar.classList.add('nova-aligned-bar'), menuEl.appendChild(bar)) : (bar.classList.remove('nova-aligned-bar'), document.body.appendChild(bar));
-    }
+function toggleCleanMenu(enabled) {
+    config.cleanMenu = enabled;
+    saveConfig();
 
+    const targets = [
+        '#news-block',
+        '#left-column',
+        '#social-share-block',
+        'a[href*="privacy"]',
+        'a[href*="changelog"]',
+        '.language-select-wrap'
+    ];
+
+    targets.forEach(s =>
+        document.querySelectorAll(s).forEach(el =>
+            enabled
+                ? el.classList.add('nova-hidden')
+                : el.classList.remove('nova-hidden')
+        )
+    );
+
+    const bar = document.getElementById('start-bottom-right');
+    const menuEl = document.getElementById('start-menu');
+
+    if (bar && menuEl) {
+        if (enabled) {
+            bar.classList.add('nova-aligned-bar');
+            bar.classList.add('nova-clean-centered');
+            menuEl.appendChild(bar);
+        } else {
+            bar.classList.remove('nova-aligned-bar');
+            bar.classList.remove('nova-clean-centered');
+            document.body.appendChild(bar);
+        }
+    }
+}
+    function toggleAccountBlock(enabled) {
+        config.hideAccountBlock = enabled;
+        saveConfig();
+
+        const selector = '.account-block';
+        document.querySelectorAll(selector).forEach(el => {
+        if (enabled) {
+            el.classList.add('nova-hidden');
+        } else {
+            el.classList.remove('nova-hidden');
+        }
+    });
+}
+function toggleClassicLogo(enabled) {
+    config.classicLogo = enabled;
+    saveConfig();
+
+    const OLD_LOGO = 'https://survev.io/img/survev_logo_full.png';
+    const NEW_LOGO = 'https://survev.io/img/surviv_logo_full.png';
+
+    const targetSrc = enabled ? OLD_LOGO : NEW_LOGO;
+    const replacementSrc = enabled ? NEW_LOGO : OLD_LOGO;
+
+    document.querySelectorAll('img').forEach(img => {
+        if (img.src === targetSrc) {
+            img.src = replacementSrc;
+        }
+    });
+
+    document.querySelectorAll('*').forEach(el => {
+        const bg = getComputedStyle(el).backgroundImage;
+        if (bg.includes(targetSrc)) {
+            el.style.backgroundImage = bg.replace(targetSrc, replacementSrc);
+        }
+    });
+}
     function loadCategory(cat) {
         contentArea.innerHTML = `
             <div class="cat-header">
@@ -438,7 +546,7 @@
                     card.querySelector('.edit').onclick = (e) => { e.stopPropagation(); const n = prompt("New Name:", bg.name); if(n) bg.name = n; saveConfig(); loadCategory('Backgrounds'); };
                     card.querySelector('.del').onclick = (e) => { e.stopPropagation(); config.customBackgrounds = config.customBackgrounds.filter(i=>i.id!==bg.id); saveConfig(); loadCategory('Backgrounds'); };
                 }
-                card.onclick = () => { config.activeBackground = bg.id; saveConfig(); applyBackground(bg.data); loadCategory('Backgrounds'); };
+                card.onclick = () => { config.activeBackground = bg.id; saveConfig(); location.reload(); applyBackground(bg.data); loadCategory('Backgrounds'); };
                 grid.appendChild(card);
             });
             contentArea.appendChild(grid);
@@ -458,10 +566,18 @@
             contentArea.appendChild(createTweak('Uncap FPS', 'uncap', config.uncap, (v) => { config.uncap = v; saveConfig(); window.requestAnimationFrame = v ? (cb)=>setTimeout(cb,1) : originalRAF; }));
             contentArea.appendChild(createTweak('Auto Fullscreen', 'afs', config.autoFS, toggleAutoFS));
         } else if (cat === 'Client') {
-            contentArea.appendChild(createTweak('Glassmorphism', 'glass', config.glass, (v) => { config.glass = v; saveConfig(); menu.classList.toggle('nova-glass', v); if(document.querySelector('.nav-item.active').dataset.cat === 'Backgrounds') loadCategory('Backgrounds'); }));
+            contentArea.appendChild(createTweak('Glassmorphism', 'glass', config.glass, (v) => {
+                config.glass = v;
+                saveConfig();
+                menu.classList.toggle('nova-glass', v);
+                toggleGlassStyle(v); // Toggles the provided Start Menu style
+                if(document.querySelector('.nav-item.active').dataset.cat === 'Backgrounds') loadCategory('Backgrounds');
+            }));
             contentArea.appendChild(createTweak('Fast Menu', 'fast', config.fastMenu, (v) => { config.fastMenu = v; saveConfig(); menu.classList.toggle('nova-animate', !v); }));
         } else if (cat === 'Misc') {
             contentArea.appendChild(createTweak('Clean Menu', 'clean', config.cleanMenu, toggleCleanMenu));
+            contentArea.appendChild(createTweak('Hide Account Block', 'hideAccountBlock', config.hideAccountBlock, toggleAccountBlock));
+            contentArea.appendChild(createTweak('Use Classic Logo', 'useClassicLogo', config.useClassicLogo, toggleClassicLogo));
         }
     }
 
@@ -510,15 +626,39 @@
     if (config.ping) togglePing(true);
     if (config.uncap) window.requestAnimationFrame = (cb)=>setTimeout(cb,1);
     if (config.cleanMenu) toggleCleanMenu(true);
+    if (config.hideAccountBlock) toggleAccountBlock(true);
+    if (config.useClassicLogo) toggleClassicLogo(true);
     if (config.autoFS) toggleAutoFS(true);
     if (config.shuffleEnabled) toggleShuffle(true);
+    toggleGlassStyle(config.glass);
     renderCustomLabels();
 
     if (config.activeCrosshair) { const x = config.customCrosshairs.find(i => i.id === config.activeCrosshair); if (x) applyCrosshair(x.data); }
-    if (config.activeBackground) {
-        const b = [...defaultBackgrounds, ...config.customBackgrounds].find(i => i.id === config.activeBackground);
-        if (b) { const bgEl = document.querySelector("#background"); if (bgEl) bgEl.style.backgroundImage = `url("${b.data}")`; }
+function forceBackground() {
+    const bgEl = document.querySelector("#background");
+    if (!bgEl) {
+        requestAnimationFrame(forceBackground);
+        return;
     }
+
+    const b = [...defaultBackgrounds, ...config.customBackgrounds]
+        .find(i => i.id === config.activeBackground);
+
+    if (!b) return;
+
+
+    bgEl.style.backgroundImage = `url("${b.data}")`;
+
+    new MutationObserver(() => {
+        if (bgEl.style.backgroundImage !== `url("${b.data}")`) {
+            bgEl.style.backgroundImage = `url("${b.data}")`;
+        }
+    }).observe(bgEl, { attributes: true, attributeFilter: ['style'] });
+}
+
+if (config.activeBackground) {
+    forceBackground();
+}
     menu.classList.toggle('nova-glass', config.glass);
     menu.classList.toggle('nova-animate', !config.fastMenu);
 })();
