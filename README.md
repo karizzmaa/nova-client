@@ -18,9 +18,12 @@ Please join our discord server from [here](https://discord.gg/ar6TjbVzSF)!
 <li> Uncap FPS
 <li> Auto Fullscreen
 <li> Custom Crosshairs
+<li> Keybind Changer
 <li> Interchangeable Backgrounds
 <li> Toggleable Glassmorphism
 <li> Clean Menu
+<li> Use Classic Logo
+<li> Hide Account Block
 
 # Installation 
 
@@ -29,6 +32,9 @@ Download [Tampermonkey](https://www.tampermonkey.net/crx/tampermonkey_stable.crx
 
 Then download the userscript from [here](https://raw.githubusercontent.com/karizzmaa/nova-client/main/dist/userscript.js).
 
+# Gallery
+<img width="1280" height="800" alt="{3B3E1FCE-C5BF-4BF2-9B51-696D498AC0F2}" src="https://github.com/user-attachments/assets/4924b636-f621-4f05-b667-32157b2e2a0f" />
+<img width="1280" height="800" alt="{0EB8F25A-1FFD-46C0-B1EF-4E9808EA8BD9}" src="https://github.com/user-attachments/assets/f3ac5bfd-2d21-460b-9397-acd7d959a74d" />
 
 ## Crosshair Tutorial
 1. Go to https://alimg.github.io/crosshair-for-survivio/
