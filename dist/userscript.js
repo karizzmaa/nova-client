@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Client
 // @namespace    https://github.com/karizzmaa/nova-client/
-// @version      2.1.1
+// @version      2.1.2
 // @description  Customizable Mod menu for Survev.io.
 // @author       karizzmaa
 // @match        *://survev.io/*
@@ -45,6 +45,7 @@
     const defaultConfig = {
         fps: false,
         ping: false,
+        hpAd: false,
         uncap: false,
         glass: true,
         fastMenu: false,
@@ -61,6 +62,7 @@
         shuffleEnabled: false,
         fpsPos: { top: '60%', left: '10px' },
         pingPos: { top: '65%', left: '10px' },
+        hpAdPos: { top: '70%', left: '10px' },
         customLabels: []
     };
 
@@ -69,6 +71,7 @@
 
     if(!config.fpsPos) config.fpsPos = defaultConfig.fpsPos;
     if(!config.pingPos) config.pingPos = defaultConfig.pingPos;
+    if(!config.hpAdPos) config.hpAdPos = defaultConfig.hpAdPos;
     if(!config.customLabels) config.customLabels = [];
     if(!config.customKeybinds) config.customKeybinds = [];
 
@@ -85,6 +88,8 @@
     let fpsDisplay = null;
     let fpsAnimationId = null;
     let pingDisplay = null;
+    let hpAdDisplay = null;
+    let hpAdInterval = null;
     let ws = null;
     const originalRAF = window.requestAnimationFrame;
 
@@ -304,6 +309,82 @@ function applyBackground(url) {
             pingDisplay = null;
         }
     }
+function toggleHPAD(enabled) {
+    config.hpAd = enabled;
+    saveConfig();
+
+    if (enabled && !hpAdDisplay) {
+
+        hpAdDisplay = document.createElement('div');
+        hpAdDisplay.className = 'nova-label';
+        hpAdDisplay.innerHTML = 'HP: -- | AD: --';
+
+        hpAdDisplay.style.top = config.hpAdPos.top;
+        hpAdDisplay.style.left = config.hpAdPos.left;
+
+        if(config.hpAdPos.top.includes('%'))
+            hpAdDisplay.style.transform = 'translateY(-50%)';
+
+        document.body.appendChild(hpAdDisplay);
+
+hpAdInterval = setInterval(() => {
+
+    const gameArea = document.getElementById("game-touch-area");
+
+    // If game-touch-area doesn't exist or is not visible → hide counter
+    if (!gameArea) {
+        if (hpAdDisplay) hpAdDisplay.style.display = "none";
+        return;
+    }
+
+    const rect = gameArea.getBoundingClientRect();
+    const fullyVisible =
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= window.innerHeight &&
+        rect.right <= window.innerWidth;
+
+    if (!fullyVisible) {
+        if (hpAdDisplay) hpAdDisplay.style.display = "none";
+        return;
+    }
+
+    // If visible → show counter
+    hpAdDisplay.style.display = "block";
+
+    // HP
+    const hpEl = document.getElementById("ui-health-actual");
+    let hp = 0;
+    if (hpEl) hp = parseFloat(hpEl.style.width) || 0;
+
+    // AD
+    const getBoost = (id) => {
+        const el = document.querySelector(`#${id} .ui-bar-inner`);
+        return el ? parseFloat(el.style.width) || 0 : 0;
+    };
+
+    const boost0 = getBoost("ui-boost-counter-0");
+    const boost1 = getBoost("ui-boost-counter-1");
+    const boost2 = getBoost("ui-boost-counter-2");
+    const boost3 = getBoost("ui-boost-counter-3");
+
+    const adr =
+        boost0 * 0.25 +
+        boost1 * 0.25 +
+        boost2 * 0.375 +
+        boost3 * 0.125;
+
+    hpAdDisplay.innerHTML =
+        `HP: ${Math.round(hp)} | AD: ${Math.round(adr)}`;
+
+}, 100);
+
+    } else if (!enabled && hpAdDisplay) {
+        clearInterval(hpAdInterval);
+        hpAdDisplay.remove();
+        hpAdDisplay = null;
+    }
+}
 
     function initPingSocket() {
         const getWsUrl = () => {
@@ -551,17 +632,133 @@ function toggleClassicLogo(enabled) {
             });
             contentArea.appendChild(grid);
         } else if (cat === 'Labels') {
-            contentArea.appendChild(createTweak('FPS Counter', 'fps', config.fps, toggleFPS, { text: 'Move', action: () => { if(!config.fps) { toggleFPS(true); config.fps=true; saveConfig(); loadCategory('Labels'); } enterEditMode(fpsDisplay, 'fpsPos', defaultConfig.fpsPos, () => loadCategory('Labels')); } }));
-            contentArea.appendChild(createTweak('Ping / LAT Counter', 'ping', config.ping, togglePing, { text: 'Move', action: () => { if(!config.ping) { togglePing(true); config.ping=true; saveConfig(); loadCategory('Labels'); } enterEditMode(pingDisplay, 'pingPos', defaultConfig.pingPos, () => loadCategory('Labels')); } }));
-            const clHeader = document.createElement('div'); clHeader.className = 'cat-header'; clHeader.style.marginTop = '20px'; clHeader.innerHTML = `<div class="cat-title" style="font-size:16px">Custom Labels</div>`;
-            const addLbl = document.createElement('button'); addLbl.className = 'move-btn'; addLbl.style.background = '#60cdff'; addLbl.style.color = 'black'; addLbl.style.fontWeight = 'bold'; addLbl.innerText = '+ Add New'; addLbl.onclick = openLabelCreator;
-            clHeader.appendChild(addLbl); contentArea.appendChild(clHeader);
+
+            contentArea.appendChild(
+                createTweak(
+                    'FPS Counter',
+                    'fps',
+                    config.fps,
+                    toggleFPS,
+                    {
+                        text: 'Move',
+                        action: () => {
+                            if (!config.fps) {
+                                toggleFPS(true);
+                                config.fps = true;
+                                saveConfig();
+                                loadCategory('Labels');
+                            }
+                            enterEditMode(
+                                fpsDisplay,
+                                'fpsPos',
+                                defaultConfig.fpsPos,
+                                () => loadCategory('Labels')
+                            );
+                        }
+                    }
+                )
+            );
+
+            contentArea.appendChild(
+                createTweak(
+                    'Ping / LAT Counter',
+                    'ping',
+                    config.ping,
+                    togglePing,
+                    {
+                        text: 'Move',
+                        action: () => {
+                            if (!config.ping) {
+                                togglePing(true);
+                                config.ping = true;
+                                saveConfig();
+                                loadCategory('Labels');
+                            }
+                            enterEditMode(
+                                pingDisplay,
+                                'pingPos',
+                                defaultConfig.pingPos,
+                                () => loadCategory('Labels')
+                            );
+                        }
+                    }
+                )
+            );
+
+            contentArea.appendChild(
+                createTweak(
+                    'HP + AD Counter',
+                    'hpAd',
+                    config.hpAd,
+                    toggleHPAD,
+                    {
+                        text: 'Move',
+                        action: () => {
+                            if (!config.hpAd) {
+                                toggleHPAD(true);
+                                config.hpAd = true;
+                                saveConfig();
+                                loadCategory('Labels');
+                            }
+                            enterEditMode(
+                                hpAdDisplay,
+                                'hpAdPos',
+                                defaultConfig.hpAdPos,
+                                () => loadCategory('Labels')
+                            );
+                        }
+                    }
+                )
+            );
+
+            const clHeader = document.createElement('div');
+            clHeader.className = 'cat-header';
+            clHeader.style.marginTop = '20px';
+            clHeader.innerHTML =
+                `<div class="cat-title" style="font-size:16px">Custom Labels</div>`;
+
+            const addLbl = document.createElement('button');
+            addLbl.className = 'move-btn';
+            addLbl.style.background = '#60cdff';
+            addLbl.style.color = 'black';
+            addLbl.style.fontWeight = 'bold';
+            addLbl.innerText = '+ Add New';
+            addLbl.onclick = openLabelCreator;
+
+            clHeader.appendChild(addLbl);
+            contentArea.appendChild(clHeader);
+
             config.customLabels.forEach(lbl => {
-                const row = document.createElement('div'); row.className = 'tweak-card'; row.innerHTML = `<span style="color:${lbl.color}">${lbl.text}</span><div><button class="move-btn">Move</button><button class="move-btn" style="background:rgba(255,50,50,0.3);color:#ff6b6b">Del</button></div>`;
-                row.querySelector('.move-btn').onclick = () => { const el = document.getElementById(`lbl-${lbl.id}`); enterEditMode(el, {type: 'label', id: lbl.id}, { top: '50%', left: '50%' }, () => loadCategory('Labels')); };
-                row.querySelectorAll('.move-btn')[1].onclick = () => { config.customLabels = config.customLabels.filter(l => l.id !== lbl.id); saveConfig(); renderCustomLabels(); loadCategory('Labels'); };
+                const row = document.createElement('div');
+                row.className = 'tweak-card';
+                row.innerHTML =
+                    `<span style="color:${lbl.color}">${lbl.text}</span>
+                     <div>
+                        <button class="move-btn">Move</button>
+                        <button class="move-btn" style="background:rgba(255,50,50,0.3);color:#ff6b6b">Del</button>
+                     </div>`;
+
+                row.querySelector('.move-btn').onclick = () => {
+                    const el = document.getElementById(`lbl-${lbl.id}`);
+                    enterEditMode(
+                        el,
+                        { type: 'label', id: lbl.id },
+                        { top: '50%', left: '50%' },
+                        () => loadCategory('Labels')
+                    );
+                };
+
+                row.querySelectorAll('.move-btn')[1].onclick = () => {
+                    config.customLabels =
+                        config.customLabels.filter(l => l.id !== lbl.id);
+                    saveConfig();
+                    renderCustomLabels();
+                    loadCategory('Labels');
+                };
+
                 contentArea.appendChild(row);
             });
+
         } else if (cat === 'Gameplay') {
             contentArea.appendChild(createTweak('Uncap FPS', 'uncap', config.uncap, (v) => { config.uncap = v; saveConfig(); window.requestAnimationFrame = v ? (cb)=>setTimeout(cb,1) : originalRAF; }));
             contentArea.appendChild(createTweak('Auto Fullscreen', 'afs', config.autoFS, toggleAutoFS));
@@ -624,6 +821,7 @@ function toggleClassicLogo(enabled) {
     loadCategory('Labels');
     if (config.fps) toggleFPS(true);
     if (config.ping) togglePing(true);
+    if (config.hpAd) toggleHPAD(true);
     if (config.uncap) window.requestAnimationFrame = (cb)=>setTimeout(cb,1);
     if (config.cleanMenu) toggleCleanMenu(true);
     if (config.hideAccountBlock) toggleAccountBlock(true);
