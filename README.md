@@ -78,4 +78,4 @@ If you enjoy using Nova Client:
 ## 📝 License
 This project is released under the **MIT License** — see the LICENSE file for details.
 
-**Made with ❤️ by [KaRiZma]**
+**Made with ❤️ by KaRiZma**
