@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Client
 // @namespace    https://github.com/karizzmaa/nova-client/
-// @version      2.1.3
+// @version      2.1.4
 // @description  Customizable Mod menu for Survev.io.
 // @author       karizzmaa
 // @match        *://survev.io/*
@@ -94,7 +94,8 @@
     nameInterval: 0.1,
     randomNames: ["Player", "NovaUser", "Pro"],
     autoHideMinimap: false,
-
+    killCounter: false,
+    killCounterPos: { top: "75%", left: "10px" },
   };
 
   let config = JSON.parse(localStorage.getItem("nova_config")) || defaultConfig;
@@ -105,6 +106,8 @@
   if (!config.hpAdPos) config.hpAdPos = defaultConfig.hpAdPos;
   if (!config.customLabels) config.customLabels = [];
   if (!config.customKeybinds) config.customKeybinds = [];
+  if (!config.killCounterPos)
+    config.killCounterPos = defaultConfig.killCounterPos;
 
   let shuffleInterval = null;
 
@@ -123,6 +126,8 @@
   let pingDisplay = null;
   let hpAdDisplay = null;
   let hpAdInterval = null;
+  let killCounterDisplay = null;
+  let killCounterInterval = null;
   let ws = null;
   const originalRAF = window.requestAnimationFrame;
   function applyFPSLimiter() {
@@ -460,6 +465,37 @@
       hpAdDisplay = null;
     }
   }
+  function toggleKillCounter(enabled) {
+    config.killCounter = enabled;
+    saveConfig();
+
+    if (enabled && !killCounterDisplay) {
+      killCounterDisplay = document.createElement("div");
+      killCounterDisplay.className = "nova-label";
+      killCounterDisplay.innerHTML = "Kills: 0";
+
+      killCounterDisplay.style.top = config.killCounterPos.top;
+      killCounterDisplay.style.left = config.killCounterPos.left;
+
+      if (config.killCounterPos.top.includes("%"))
+        killCounterDisplay.style.transform = "translateY(-50%)";
+
+      document.body.appendChild(killCounterDisplay);
+      applyLabelContainerMode();
+
+      killCounterInterval = setInterval(() => {
+        const killEl = document.querySelector(".ui-player-kills");
+        if (killEl && killCounterDisplay) {
+          const kills = killEl.textContent.trim();
+          killCounterDisplay.innerHTML = `Kills: ${kills}`;
+        }
+      }, 50);
+    } else if (!enabled && killCounterDisplay) {
+      clearInterval(killCounterInterval);
+      killCounterDisplay.remove();
+      killCounterDisplay = null;
+    }
+  }
 
   function initPingSocket() {
     const getWsUrl = () => {
@@ -683,40 +719,32 @@
       nameIntervalId = null;
     }
   }
-    let autoHideMinimapInterval = null;
-let minimapHiddenThisMatch = false;
+  let autoHideMinimapInterval = null;
+  let minimapHiddenThisMatch = false;
 
-function toggleAutoHideMinimap(enabled) {
+  function toggleAutoHideMinimap(enabled) {
     config.autoHideMinimap = enabled;
     saveConfig();
 
     if (enabled) {
+      autoHideMinimapInterval = setInterval(() => {
+        const btn = document.getElementById("ui-map-minimize");
 
-        autoHideMinimapInterval = setInterval(() => {
-            const btn = document.getElementById("ui-map-minimize");
-
-            if (btn && btn.offsetParent !== null) {
-
-                if (!minimapHiddenThisMatch) {
-                    btn.click();
-                    minimapHiddenThisMatch = true;
-                }
-
-            } else {
-                minimapHiddenThisMatch = false;
-            }
-
-        }, 50);
-
+        if (btn && btn.offsetParent !== null) {
+          if (!minimapHiddenThisMatch) {
+            btn.click();
+            minimapHiddenThisMatch = true;
+          }
+        } else {
+          minimapHiddenThisMatch = false;
+        }
+      }, 50);
     } else {
-
-        clearInterval(autoHideMinimapInterval);
-        autoHideMinimapInterval = null;
-        minimapHiddenThisMatch = false;
-
+      clearInterval(autoHideMinimapInterval);
+      autoHideMinimapInterval = null;
+      minimapHiddenThisMatch = false;
     }
-}
-
+  }
 
   function loadCategory(cat) {
     contentArea.innerHTML = `
@@ -952,6 +980,31 @@ function toggleAutoHideMinimap(enabled) {
           },
         }),
       );
+      contentArea.appendChild(
+        createTweak(
+          "Kill Counter",
+          "killCounter",
+          config.killCounter,
+          toggleKillCounter,
+          {
+            text: "Move",
+            action: () => {
+              if (!config.killCounter) {
+                toggleKillCounter(true);
+                config.killCounter = true;
+                saveConfig();
+                loadCategory("Labels");
+              }
+              enterEditMode(
+                killCounterDisplay,
+                "killCounterPos",
+                defaultConfig.killCounterPos,
+                () => loadCategory("Labels"),
+              );
+            },
+          },
+        ),
+      );
 
       const clHeader = document.createElement("div");
       clHeader.className = "cat-header";
@@ -1149,15 +1202,14 @@ function toggleAutoHideMinimap(enabled) {
           },
         ),
       );
-contentArea.appendChild(
-    createTweak(
-        "AutoHide Minimap",
-        "autoHideMinimap",
-        config.autoHideMinimap,
-        toggleAutoHideMinimap
-    )
-);
-
+      contentArea.appendChild(
+        createTweak(
+          "AutoHide Minimap",
+          "autoHideMinimap",
+          config.autoHideMinimap,
+          toggleAutoHideMinimap,
+        ),
+      );
     } else if (cat === "Client") {
       contentArea.appendChild(
         createTweak("Glassmorphism", "glass", config.glass, (v) => {
@@ -1323,7 +1375,7 @@ contentArea.appendChild(
   renderCustomLabels();
   if (config.nameRandomizer) {
     toggleNameRandomizer(true);
-      if (config.autoHideMinimap) toggleAutoHideMinimap(true);
+    if (config.autoHideMinimap) toggleAutoHideMinimap(true);
   }
 
   if (config.activeCrosshair) {
