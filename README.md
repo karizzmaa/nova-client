@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://github.com/karizzmaa/nova-client/releases">
-    <img src="https://img.shields.io/badge/Version-2.1.4-white?style=for-the-badge" />
+    <img src="https://img.shields.io/badge/Version-2.1.6-white?style=for-the-badge" />
   </a>
   <a href="https://discord.gg/n65gPeakkn">
     <img src="https://img.shields.io/badge/Discord-Join_Server-white?style=for-the-badge&logo=discord&logoColor=white" />
