@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Nova Client
 // @namespace    https://github.com/karizzmaa/nova-client/
-// @version      2.1.5
+// @version      2.1.7
 // @description  Customizable Mod menu for Survev.io.
 // @author       karizzmaa
 // @match        *://survev.io/*
@@ -509,7 +509,7 @@ function getUsername() {
         };
     }
 
-    function toggleFPS(enabled) {
+function toggleFPS(enabled) {
         config.fps = enabled;
         saveConfig();
         if (enabled && !fpsDisplay) {
@@ -521,14 +521,28 @@ function getUsername() {
                 fpsDisplay.style.transform = "translateY(-50%)";
             document.body.appendChild(fpsDisplay);
             applyLabelContainerMode();
+
             let times = [];
+            let lastDomUpdate = 0; // Track when we last updated the text
+
             const run = () => {
                 fpsAnimationId = requestAnimationFrame(() => {
                     const now = performance.now();
+
+                    // Keep counting frames in real-time
                     while (times.length > 0 && times[0] <= now - 1000) times.shift();
                     times.push(now);
+
+                    // Only update the visual text every 250ms
+                    if (now - lastDomUpdate >= 250) {
+                        if (fpsDisplay) {
+                            fpsDisplay.innerHTML = `${times.length} FPS`;
+                        }
+                        lastDomUpdate = now;
+                    }
+
+                    // Continue the loop if the display is still active
                     if (fpsDisplay) {
-                        fpsDisplay.innerHTML = `${times.length} FPS`;
                         run();
                     }
                 });
@@ -540,7 +554,6 @@ function getUsername() {
             cancelAnimationFrame(fpsAnimationId);
         }
     }
-
     function togglePing(enabled) {
         config.ping = enabled;
         saveConfig();
@@ -1092,6 +1105,27 @@ function getUsername() {
                 grid.appendChild(card);
             });
             contentArea.appendChild(grid);
+            grid.appendChild(addBtn);
+const resetCard = document.createElement("div");
+resetCard.className = `item-card ${!config.activeBackground ? "active" : ""}`;
+resetCard.innerHTML = `
+    <div style="font-size:40px; opacity:0.6;">↺</div>
+    <span class="item-name">Original</span>
+`;
+
+resetCard.onclick = () => {
+    config.activeBackground = null;
+    saveConfig();
+
+    const bg = document.querySelector("#background");
+    if (bg) {
+        bg.style.backgroundImage = "";
+    }
+
+    location.reload();
+};
+
+grid.appendChild(resetCard);
         } else if (cat === "Labels") {
             contentArea.appendChild(
                 createTweak("FPS Counter", "fps", config.fps, toggleFPS, {
